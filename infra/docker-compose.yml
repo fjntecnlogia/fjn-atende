@@ -1,0 +1,138 @@
+# =====================================================================
+# FJN Tecnologia — Infraestrutura completa em Docker Compose
+#
+# Servicos:
+#   - postgres        :5432  (banco compartilhado por atendimento + painel)
+#   - redis           :6379  (cache geral)
+#   - wppconnect      :21465 (WhatsApp via Baileys, licença ISC — sem AGPL)
+#   - fjn-atendimento :3001  (cerebro IA da Ana)
+#   - fjn-painel-api  :3100  (API do painel admin)
+#
+# Frontend painel: deploy no Vercel (separado, fora deste compose).
+#
+# Como subir (na VPS):
+#   1. Copia este repo para /opt/fjn
+#   2. cp infra/.env.example infra/.env  e preenche
+#   3. cp fjn-atendimento/.env.example fjn-atendimento/.env
+#   4. cp fjn-painel/apps/api/.env.example fjn-painel/apps/api/.env
+#   5. cd infra && docker compose up -d
+# =====================================================================
+
+services:
+  # -------------------------------------------------------------------
+  # Postgres — usado SÓ pelo WPP-Connect (sessões/cache local).
+  # O banco da aplicação está no Neon (US-East 2).
+  # -------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: fjn_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-fjn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?precisa definir POSTGRES_PASSWORD no .env}
+      POSTGRES_DB:       ${POSTGRES_DB:-wppconnect_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fjn} -d ${POSTGRES_DB:-wppconnect_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [fjn]
+
+  # -------------------------------------------------------------------
+  # Redis — cache geral
+  # -------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: fjn_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [fjn]
+
+  # -------------------------------------------------------------------
+  # WPP-Connect Server — gateway WhatsApp (Baileys)
+  # Licença: ISC (sem restrição AGPL — pode ser comercializado)
+  # Doc: https://wppconnect-team.github.io/api/
+  # Repo: https://github.com/wppconnect-team/wppconnect-server
+  # -------------------------------------------------------------------
+  wppconnect:
+    image: wppconnect/wppconnect-server:latest
+    container_name: fjn_wppconnect
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:21465:21465"   # exposta só pra localhost; Nginx faz proxy
+    environment:
+      # SECRET_KEY usada pra gerar tokens de sessão. Mantenha forte e secreta.
+      SECRET_KEY: ${WPPCONNECT_SECRET_KEY:?precisa definir WPPCONNECT_SECRET_KEY no .env}
+      # Webhook global — para onde TODA mensagem recebida é enviada
+      WEBHOOK_URL: http://fjn-atendimento:3001/webhook?token=${WEBHOOK_TOKEN}
+      WEBHOOK_ALL_UNREAD_ON_START: "false"
+      WEBHOOK_WAIT_FOR: "true"
+      LOG_LEVEL: warn
+      DELETE_SESSION_DIR_ON_LOGOUT: "true"
+    volumes:
+      - wppconnect_tokens:/usr/src/wpp-server/tokens
+      - wppconnect_userdata:/usr/src/wpp-server/userDataDir
+    networks: [fjn]
+
+  # -------------------------------------------------------------------
+  # fjn-atendimento — cérebro da Ana (Claude + processamento)
+  # -------------------------------------------------------------------
+  fjn-atendimento:
+    build:
+      context: ../fjn-atendimento
+      dockerfile: ../infra/Dockerfile.atendimento
+    container_name: fjn_atendimento
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    env_file:
+      - ../fjn-atendimento/.env
+    environment:
+      # DATABASE_URL vem do .env (aponta pro Neon US-East 2).
+      # Só sobrescrevemos o que precisa apontar pros containers.
+      WPPCONNECT_BASE_URL: http://wppconnect:21465
+      PORT: 3001
+    networks: [fjn]
+
+  # -------------------------------------------------------------------
+  # fjn-painel-api — backend do painel admin
+  # -------------------------------------------------------------------
+  fjn-painel-api:
+    build:
+      context: ../fjn-painel
+      dockerfile: ../infra/Dockerfile.painel-api
+    container_name: fjn_painel_api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"
+    env_file:
+      - ../fjn-painel/apps/api/.env
+    environment:
+      # DATABASE_URL vem do .env (Neon US-East 2)
+      WPPCONNECT_BASE_URL: http://wppconnect:21465
+      ATENDIMENTO_PATH: /atendimento_files
+      PORT: 3100
+    volumes:
+      - ../fjn-atendimento:/atendimento_files:rw
+    networks: [fjn]
+
+# =====================================================================
+
+networks:
+  fjn:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  wppconnect_tokens:
+  wppconnect_userdata:

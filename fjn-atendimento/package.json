@@ -1,0 +1,35 @@
+{
+  "name": "fjn-atendimento",
+  "version": "0.1.0",
+  "description": "Atendimento WhatsApp unificado FJN Tecnologia (STYLOGESTOR, GYMFLOW, FJN Dev)",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "db:init": "psql $DATABASE_URL -f src/db/schema.sql",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:logs": "pm2 logs fjn-atendimento",
+    "pm2:restart": "pm2 restart fjn-atendimento"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^4.28.0",
+    "form-data": "^4.0.0",
+    "openai": "^4.55.0",
+    "pg": "^8.13.0",
+    "pino-pretty": "^11.2.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

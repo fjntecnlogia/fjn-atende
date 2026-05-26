@@ -1,0 +1,182 @@
+import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import axios from "axios";
+import { db } from "../../db/client";
+import { requireTenant } from "../../lib/auth";
+import { config } from "../../config";
+
+/**
+ * Gerenciamento de instâncias WhatsApp (WPP-Connect) por tenant.
+ *
+ * Cada tenant tem uma ou mais sessões. Cada sessão = 1 número de WhatsApp.
+ * Para conectar: cria a sessão → start-session → escaneia QR → connected.
+ */
+
+function wppBaseUrl(): string {
+  return config.WPPCONNECT_BASE_URL!.replace(/\/$/, "");
+}
+
+async function generateToken(sessionName: string): Promise<string> {
+  const r = await axios.post(
+    `${wppBaseUrl()}/api/${sessionName}/${config.WPPCONNECT_SECRET_KEY}/generate-token`,
+    null,
+    { timeout: 10_000 },
+  );
+  const t = r.data?.token ?? r.data?.full?.replace(/^Bearer /, "");
+  if (!t) throw new Error("WPP-Connect: falha ao gerar token");
+  return t;
+}
+
+async function callWpp(sessionName: string, token: string, endpoint: string, data?: any) {
+  return axios.post(
+    `${wppBaseUrl()}/api/${sessionName}${endpoint}`,
+    data ?? {},
+    { headers: { Authorization: `Bearer ${token}` }, timeout: 30_000 },
+  );
+}
+
+export async function instancesRoutes(app: FastifyInstance) {
+  // -----------------------------------------------------------------
+  // Listar instâncias do tenant
+  // -----------------------------------------------------------------
+  app.get("/", { preHandler: requireTenant }, async (req) => {
+    const r = await db.query(
+      `SELECT id, session_name, phone_number, status, last_qr_at, last_connected_at, created_at
+         FROM whatsapp_instances
+        WHERE tenant_id = $1
+        ORDER BY id`,
+      [req.tenantId!],
+    );
+    return r.rows;
+  });
+
+  // -----------------------------------------------------------------
+  // Criar nova instância (1 por padrão, mais conforme plano)
+  // -----------------------------------------------------------------
+  app.post("/", { preHandler: requireTenant }, async (req, reply) => {
+    const tid = req.tenantId!;
+
+    // Verifica limite do plano
+    const limitCheck = await db.query(`
+      SELECT p.max_instances,
+        (SELECT COUNT(*)::int FROM whatsapp_instances WHERE tenant_id = t.id) AS current
+        FROM tenants t JOIN plans p ON p.slug = t.plan
+       WHERE t.id = $1
+    `, [tid]);
+    const { max_instances, current } = limitCheck.rows[0];
+    if (max_instances > 0 && current >= max_instances) {
+      return reply.code(402).send({ error: `limite do plano atingido (${current}/${max_instances})` });
+    }
+
+    const tenant = await db.query(`SELECT slug FROM tenants WHERE id = $1`, [tid]);
+    const sessionName = `t${tid}-${tenant.rows[0].slug}-${current + 1}`;
+
+    try {
+      const token = await generateToken(sessionName);
+      const r = await db.query(
+        `INSERT INTO whatsapp_instances (tenant_id, session_name, session_token, status)
+         VALUES ($1, $2, $3, 'pending') RETURNING *`,
+        [tid, sessionName, token],
+      );
+      return reply.code(201).send(r.rows[0]);
+    } catch (err: any) {
+      return reply.code(502).send({ error: `falha criando instância: ${err.message}` });
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Iniciar sessão (gera QR)
+  // -----------------------------------------------------------------
+  app.post("/:id/start", { preHandler: requireTenant }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const r = await db.query(
+      `SELECT * FROM whatsapp_instances WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId!],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
+    const inst = r.rows[0];
+
+    try {
+      const resp = await callWpp(inst.session_name, inst.session_token, "/start-session", {
+        webhook: null,
+        waitQrCode: false,
+      });
+      await db.query(
+        `UPDATE whatsapp_instances
+            SET status = 'connecting', last_qr = $2, last_qr_at = NOW(), updated_at = NOW()
+          WHERE id = $1`,
+        [id, resp.data?.qrcode ?? null],
+      );
+      return { ok: true, qr: resp.data?.qrcode, status: resp.data?.status };
+    } catch (err: any) {
+      await db.query(
+        `UPDATE whatsapp_instances SET status = 'error', updated_at = NOW() WHERE id = $1`,
+        [id],
+      );
+      return reply.code(502).send({ error: `falha iniciando sessão: ${err.message}` });
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Status atual + QR (poll)
+  // -----------------------------------------------------------------
+  app.get("/:id/status", { preHandler: requireTenant }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const r = await db.query(
+      `SELECT session_name, session_token FROM whatsapp_instances WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId!],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
+    const inst = r.rows[0];
+
+    try {
+      const resp = await axios.get(
+        `${wppBaseUrl()}/api/${inst.session_name}/status-session`,
+        { headers: { Authorization: `Bearer ${inst.session_token}` }, timeout: 10_000 },
+      );
+      const status = resp.data?.status ?? "unknown";
+      const isConnected = status === "CONNECTED" || status === "inChat";
+      await db.query(
+        `UPDATE whatsapp_instances
+            SET status = $2,
+                last_connected_at = CASE WHEN $3 THEN NOW() ELSE last_connected_at END,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [id, isConnected ? "connected" : "connecting", isConnected],
+      );
+      return { status, qrcode: resp.data?.qrcode };
+    } catch (err: any) {
+      return reply.code(502).send({ error: err.message });
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Desconectar
+  // -----------------------------------------------------------------
+  app.post("/:id/logout", { preHandler: requireTenant }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const r = await db.query(
+      `SELECT session_name, session_token FROM whatsapp_instances WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId!],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
+    try {
+      await callWpp(r.rows[0].session_name, r.rows[0].session_token, "/logout-session");
+    } catch { /* tenta deletar mesmo se falhar */ }
+    await db.query(
+      `UPDATE whatsapp_instances SET status = 'disconnected', updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+    return { ok: true };
+  });
+
+  app.delete("/:id", { preHandler: requireTenant }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const r = await db.query(
+      `DELETE FROM whatsapp_instances WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId!],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
+    return { ok: true };
+  });
+}

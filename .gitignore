@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp/
+
+# Build outputs
+dist/
+.next/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
+# Environment files (NUNCA commitar — contém credenciais!)
+.env
+.env.local
+.env.production
+.env.development
+**/.env
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data / backups
+data/
+.backups/
+
+# PM2
+.pm2/
+ecosystem.config.local.js
+
+# Tarballs
+*.tar.gz
+*.zip

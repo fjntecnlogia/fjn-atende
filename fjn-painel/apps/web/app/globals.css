@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800;900&family=Barlow:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background: #060C28;
+  color: #F4F6FF;
+}
+
+::selection {
+  background: rgba(255, 186, 0, 0.25);
+  color: #fff;
+}
+
+@layer components {
+  .card {
+    @apply bg-navy3/60 border border-border rounded-xl backdrop-blur-sm;
+  }
+  .btn-primary {
+    @apply bg-orange text-navy2 font-semibold rounded-lg px-4 py-2 hover:bg-orange2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply text-light/70 hover:text-light hover:bg-white/5 rounded-lg px-3 py-1.5 transition-colors text-sm;
+  }
+  .input {
+    @apply bg-navy2 border border-border rounded-lg px-3 py-2 text-light placeholder-gray2/60 focus:outline-none focus:border-orange transition-colors;
+  }
+  .label {
+    @apply text-xs font-semibold uppercase tracking-widest text-gray2;
+  }
+}
+
+/* Scrollbar discreta */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1A2358; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2A3578; }

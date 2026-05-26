@@ -1,0 +1,36 @@
+# Dockerfile do fjn-painel-api (monorepo)
+# Build context: ../fjn-painel
+
+FROM node:20-alpine AS builder
+WORKDIR /repo
+
+# Instala dependências do monorepo todo (necessário pro workspace shared)
+COPY package*.json turbo.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/api/package.json ./apps/api/
+RUN npm ci
+
+# Copia código
+COPY packages/shared ./packages/shared
+COPY apps/api ./apps/api
+
+# Build da API (TypeScript)
+WORKDIR /repo/apps/api
+RUN npm run build
+
+# -----
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /repo/package*.json ./
+COPY --from=builder /repo/packages/shared ./packages/shared
+COPY --from=builder /repo/apps/api/package.json ./
+COPY --from=builder /repo/apps/api/dist ./dist
+COPY --from=builder /repo/apps/api/scripts ./scripts
+COPY --from=builder /repo/apps/api/src/db/schema-admin.sql ./src/db/schema-admin.sql
+COPY --from=builder /repo/node_modules ./node_modules
+
+EXPOSE 3100
+CMD ["node", "dist/server.js"]

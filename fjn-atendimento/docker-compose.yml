@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fjn_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fjn
+      POSTGRES_PASSWORD: fjn_senha_forte
+      POSTGRES_DB: fjn_atendimento
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fjn -d fjn_atendimento"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

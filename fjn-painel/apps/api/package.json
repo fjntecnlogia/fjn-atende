@@ -1,0 +1,34 @@
+{
+  "name": "@fjn-painel/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "type-check": "tsc --noEmit",
+    "seed": "tsx scripts/seed-admin.ts",
+    "seed:tenant-user": "tsx scripts/seed-tenant-user.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/jwt": "^8.0.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "@fastify/websocket": "^10.0.0",
+    "@fjn-painel/shared": "*",
+    "axios": "^1.7.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.0",
+    "fastify": "^4.28.0",
+    "pg": "^8.13.0",
+    "pino-pretty": "^11.2.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}
