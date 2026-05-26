@@ -64,7 +64,7 @@ services:
   # Repo: https://github.com/wppconnect-team/wppconnect-server
   # -------------------------------------------------------------------
   wppconnect:
-    image: wppconnect/wppconnect-server:latest
+    image: wppconnect/server-cli:latest
     container_name: fjn_wppconnect
     restart: unless-stopped
     ports:
