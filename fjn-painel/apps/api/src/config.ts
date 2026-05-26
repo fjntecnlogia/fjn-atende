@@ -6,6 +6,8 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   DATABASE_URL: z.string().url(),
+  // URL direta (sem pooler) — opcional, usada para LISTEN/NOTIFY
+  DATABASE_URL_DIRECT: z.string().url().optional(),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES: z.string().default("7d"),
   WEB_URL: z.string().url(),
