@@ -71,8 +71,8 @@ export default function WhatsAppPage() {
           qc.invalidateQueries({ queryKey: ["instances"] });
         }
       } catch { /* ignora */ }
-      if (tries > 60) clearInterval(interval); // máx 10 min
-    }, 10_000);
+      if (tries > 200) clearInterval(interval); // máx 10 min com poll de 3s
+    }, 3_000);
   }
 
   async function logout(id: number) {

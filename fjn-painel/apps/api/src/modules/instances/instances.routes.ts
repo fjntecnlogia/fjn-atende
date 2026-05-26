@@ -99,15 +99,16 @@ export async function instancesRoutes(app: FastifyInstance) {
     try {
       const resp = await callWpp(inst.session_name, inst.session_token, "/start-session", {
         webhook: null,
-        waitQrCode: false,
+        waitQrCode: true,   // espera o QR ser gerado (WPP demora ~5s)
       });
+      const qr = resp.data?.qrcode ?? resp.data?.qr ?? null;
       await db.query(
         `UPDATE whatsapp_instances
             SET status = 'connecting', last_qr = $2, last_qr_at = NOW(), updated_at = NOW()
           WHERE id = $1`,
-        [id, resp.data?.qrcode ?? null],
+        [id, qr],
       );
-      return { ok: true, qr: resp.data?.qrcode, status: resp.data?.status };
+      return { ok: true, qr, status: resp.data?.status };
     } catch (err: any) {
       await db.query(
         `UPDATE whatsapp_instances SET status = 'error', updated_at = NOW() WHERE id = $1`,
@@ -130,21 +131,48 @@ export async function instancesRoutes(app: FastifyInstance) {
     const inst = r.rows[0];
 
     try {
-      const resp = await axios.get(
+      const headers = { Authorization: `Bearer ${inst.session_token}` };
+      // status-session retorna o status + às vezes o qrcode
+      const statusResp = await axios.get(
         `${wppBaseUrl()}/api/${inst.session_name}/status-session`,
-        { headers: { Authorization: `Bearer ${inst.session_token}` }, timeout: 10_000 },
+        { headers, timeout: 10_000 },
       );
-      const status = resp.data?.status ?? "unknown";
+      const status = statusResp.data?.status ?? "unknown";
       const isConnected = status === "CONNECTED" || status === "inChat";
+
+      // Se não veio qrcode no status mas a sessão ainda não está conectada,
+      // pega via endpoint dedicado.
+      let qrcode = statusResp.data?.qrcode ?? statusResp.data?.qr ?? null;
+      if (!qrcode && !isConnected) {
+        try {
+          const qrResp = await axios.get(
+            `${wppBaseUrl()}/api/${inst.session_name}/qrcode-session`,
+            { headers, timeout: 8_000, responseType: "arraybuffer" },
+          );
+          // Pode vir como imagem binária ou como JSON
+          const ct = qrResp.headers["content-type"] ?? "";
+          if (ct.includes("image")) {
+            qrcode = `data:${ct};base64,${Buffer.from(qrResp.data).toString("base64")}`;
+          } else {
+            const text = Buffer.from(qrResp.data).toString("utf-8");
+            try {
+              const parsed = JSON.parse(text);
+              qrcode = parsed.qrcode ?? parsed.qr ?? null;
+            } catch { /* não é JSON */ }
+          }
+        } catch { /* QR ainda não pronto */ }
+      }
+
       await db.query(
         `UPDATE whatsapp_instances
             SET status = $2,
+                last_qr = COALESCE($4, last_qr),
                 last_connected_at = CASE WHEN $3 THEN NOW() ELSE last_connected_at END,
                 updated_at = NOW()
           WHERE id = $1`,
-        [id, isConnected ? "connected" : "connecting", isConnected],
+        [id, isConnected ? "connected" : "connecting", isConnected, qrcode],
       );
-      return { status, qrcode: resp.data?.qrcode };
+      return { status, qrcode };
     } catch (err: any) {
       return reply.code(502).send({ error: err.message });
     }
