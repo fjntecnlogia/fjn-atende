@@ -14,6 +14,6 @@
     "baseUrl": "./",
     "paths": { "@fjn-painel/shared": ["../../packages/shared/src"] }
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "scripts"]
 }
