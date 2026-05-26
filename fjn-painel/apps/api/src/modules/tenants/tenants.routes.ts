@@ -14,9 +14,9 @@ export async function tenantsRoutes(app: FastifyInstance) {
   app.get("/overview", { preHandler: requireSuperAdmin }, async () => {
     const [tenants, signups, conversations, messages, mrr] = await Promise.all([
       db.query(`SELECT
-                  COUNT(*)::int FILTER (WHERE status = 'active') AS active,
-                  COUNT(*)::int FILTER (WHERE plan = 'trial')    AS trial,
-                  COUNT(*)::int FILTER (WHERE status = 'suspended') AS suspended,
+                  (COUNT(*) FILTER (WHERE status = 'active'))::int    AS active,
+                  (COUNT(*) FILTER (WHERE plan = 'trial'))::int       AS trial,
+                  (COUNT(*) FILTER (WHERE status = 'suspended'))::int AS suspended,
                   COUNT(*)::int AS total
                 FROM tenants`),
       db.query(`SELECT COUNT(*)::int AS n FROM tenants
