@@ -97,18 +97,58 @@ export async function instancesRoutes(app: FastifyInstance) {
     const inst = r.rows[0];
 
     try {
-      const resp = await callWpp(inst.session_name, inst.session_token, "/start-session", {
+      const headers = { Authorization: `Bearer ${inst.session_token}` };
+
+      // 1. Dispara start-session (assíncrono — WPP retorna rápido, ainda CLOSED)
+      await callWpp(inst.session_name, inst.session_token, "/start-session", {
         webhook: null,
-        waitQrCode: true,   // espera o QR ser gerado (WPP demora ~5s)
+        waitQrCode: false,
       });
-      const qr = resp.data?.qrcode ?? resp.data?.qr ?? null;
+
+      // 2. Faz polling interno por até 25s pra capturar o QR
+      let qr: string | null = null;
+      let status: string | undefined;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      for (let attempt = 0; attempt < 12; attempt++) {
+        await sleep(2_000);
+
+        // Tenta endpoint dedicado (retorna PNG)
+        try {
+          const qrResp = await axios.get(
+            `${wppBaseUrl()}/api/${inst.session_name}/qrcode-session`,
+            { headers, timeout: 6_000, responseType: "arraybuffer" },
+          );
+          const ct = qrResp.headers["content-type"] ?? "";
+          if (ct.includes("image") && qrResp.data.length > 100) {
+            qr = `data:${ct};base64,${Buffer.from(qrResp.data).toString("base64")}`;
+            break;
+          }
+        } catch { /* segue */ }
+
+        // Tenta status-session (pode trazer qrcode como base64)
+        try {
+          const statusResp = await axios.get(
+            `${wppBaseUrl()}/api/${inst.session_name}/status-session`,
+            { headers, timeout: 6_000 },
+          );
+          status = statusResp.data?.status;
+          const maybeQr = statusResp.data?.qrcode ?? statusResp.data?.qr;
+          if (maybeQr && maybeQr.length > 100) {
+            qr = maybeQr;
+            break;
+          }
+          if (status === "CONNECTED" || status === "inChat") break;
+        } catch { /* segue */ }
+      }
+
       await db.query(
         `UPDATE whatsapp_instances
             SET status = 'connecting', last_qr = $2, last_qr_at = NOW(), updated_at = NOW()
           WHERE id = $1`,
         [id, qr],
       );
-      return { ok: true, qr, status: resp.data?.status };
+      return { ok: true, qr, status };
     } catch (err: any) {
       await db.query(
         `UPDATE whatsapp_instances SET status = 'error', updated_at = NOW() WHERE id = $1`,
