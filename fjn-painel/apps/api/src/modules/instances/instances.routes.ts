@@ -120,7 +120,7 @@ export async function instancesRoutes(app: FastifyInstance) {
             `${wppBaseUrl()}/api/${inst.session_name}/qrcode-session`,
             { headers, timeout: 6_000, responseType: "arraybuffer" },
           );
-          const ct = qrResp.headers["content-type"] ?? "";
+          const ct = String(qrResp.headers["content-type"] ?? "");
           if (ct.includes("image") && qrResp.data.length > 100) {
             qr = `data:${ct};base64,${Buffer.from(qrResp.data).toString("base64")}`;
             req.log.info({ attempt, qr_len: qrResp.data.length }, "QR capturado via qrcode-session");
@@ -194,7 +194,7 @@ export async function instancesRoutes(app: FastifyInstance) {
             { headers, timeout: 8_000, responseType: "arraybuffer" },
           );
           // Pode vir como imagem binária ou como JSON
-          const ct = qrResp.headers["content-type"] ?? "";
+          const ct = String(qrResp.headers["content-type"] ?? "");
           if (ct.includes("image")) {
             qrcode = `data:${ct};base64,${Buffer.from(qrResp.data).toString("base64")}`;
           } else {
