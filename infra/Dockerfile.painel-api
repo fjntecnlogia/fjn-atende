@@ -8,11 +8,14 @@ WORKDIR /repo
 COPY package*.json turbo.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 # Copia código
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
+
+# Migrations
+RUN mkdir -p ./apps/api/src/db/migrations
 
 # Build da API (TypeScript)
 WORKDIR /repo/apps/api
@@ -29,7 +32,7 @@ COPY --from=builder /repo/packages/shared ./packages/shared
 COPY --from=builder /repo/apps/api/package.json ./
 COPY --from=builder /repo/apps/api/dist ./dist
 COPY --from=builder /repo/apps/api/scripts ./scripts
-COPY --from=builder /repo/apps/api/src/db/schema-admin.sql ./src/db/schema-admin.sql
+COPY --from=builder /repo/apps/api/src/db ./src/db
 COPY --from=builder /repo/node_modules ./node_modules
 
 EXPOSE 3100
