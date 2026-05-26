@@ -64,7 +64,9 @@ services:
   # Repo: https://github.com/wppconnect-team/wppconnect-server
   # -------------------------------------------------------------------
   wppconnect:
-    image: wppconnect/server-cli:latest
+    # NOTA: tentamos antes wppconnect/server-cli (era CLI, não gerava QR).
+    # Esta é a imagem do server completo, mantida ativamente.
+    image: unilogica/wppconnect-server:2.8.6-7
     container_name: fjn_wppconnect
     restart: unless-stopped
     ports:
