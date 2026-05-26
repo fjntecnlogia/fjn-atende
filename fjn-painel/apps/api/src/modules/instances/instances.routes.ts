@@ -105,12 +105,13 @@ export async function instancesRoutes(app: FastifyInstance) {
         waitQrCode: false,
       });
 
-      // 2. Faz polling interno por até 25s pra capturar o QR
+      // 2. Faz polling interno por até 50s pra capturar o QR
+      //    (WPP-Connect leva 10-30s pra inicializar Chrome + WA Web)
       let qr: string | null = null;
       let status: string | undefined;
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-      for (let attempt = 0; attempt < 12; attempt++) {
+      for (let attempt = 0; attempt < 25; attempt++) {
         await sleep(2_000);
 
         // Tenta endpoint dedicado (retorna PNG)
@@ -122,6 +123,7 @@ export async function instancesRoutes(app: FastifyInstance) {
           const ct = qrResp.headers["content-type"] ?? "";
           if (ct.includes("image") && qrResp.data.length > 100) {
             qr = `data:${ct};base64,${Buffer.from(qrResp.data).toString("base64")}`;
+            req.log.info({ attempt, qr_len: qrResp.data.length }, "QR capturado via qrcode-session");
             break;
           }
         } catch { /* segue */ }
@@ -136,8 +138,10 @@ export async function instancesRoutes(app: FastifyInstance) {
           const maybeQr = statusResp.data?.qrcode ?? statusResp.data?.qr;
           if (maybeQr && maybeQr.length > 100) {
             qr = maybeQr;
+            req.log.info({ attempt, status }, "QR capturado via status-session");
             break;
           }
+          req.log.debug({ attempt, status }, "aguardando QR...");
           if (status === "CONNECTED" || status === "inChat") break;
         } catch { /* segue */ }
       }

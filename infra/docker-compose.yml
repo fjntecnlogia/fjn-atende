@@ -70,7 +70,8 @@ services:
     ports:
       - "127.0.0.1:21465:21465"   # exposta só pra localhost; Nginx faz proxy
     environment:
-      # SECRET_KEY usada pra gerar tokens de sessão. Mantenha forte e secreta.
+      # SECRET_KEY usada pra gerar tokens de sessão.
+      # ATENÇÃO: a imagem server-cli ignora essa env var — usa o hardcoded.
       SECRET_KEY: ${WPPCONNECT_SECRET_KEY:?precisa definir WPPCONNECT_SECRET_KEY no .env}
       # Webhook global — para onde TODA mensagem recebida é enviada
       WEBHOOK_URL: http://fjn-atendimento:3001/webhook?token=${WEBHOOK_TOKEN}
@@ -78,6 +79,9 @@ services:
       WEBHOOK_WAIT_FOR: "true"
       LOG_LEVEL: warn
       DELETE_SESSION_DIR_ON_LOGOUT: "true"
+      # Desabilita auto-close (default é 60s — fecha a sessão antes do QR ser escaneado)
+      WHATSAPP_AUTO_CLOSE: "0"
+      AUTO_CLOSE: "0"
     volumes:
       - wppconnect_tokens:/usr/src/wpp-server/tokens
       - wppconnect_userdata:/usr/src/wpp-server/userDataDir
