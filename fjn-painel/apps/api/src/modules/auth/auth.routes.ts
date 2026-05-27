@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { db } from "../../db/client";
 import { requireAuth } from "../../lib/auth";
 import { getTenant, getTenantBySlug } from "../../lib/tenant";
+import { sendWelcomeEmail } from "../../lib/email";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -129,6 +130,13 @@ export async function authRoutes(app: FastifyInstance) {
         role: user.role,
         tenant_id: tenant.id,
       });
+
+      // E-mail de boas-vindas (fire-and-forget — não bloqueia a resposta)
+      sendWelcomeEmail({
+        to: user.email,
+        userName: user.name,
+        tenantName: tenant.name,
+      }).catch((err) => req.log.warn({ err }, "Falha enviando welcome email"));
 
       return reply.code(201).send({ token, user, tenant });
     } catch (err: any) {

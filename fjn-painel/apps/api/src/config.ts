@@ -40,6 +40,11 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(""),
   STRIPE_SUCCESS_URL: z.string().url().optional().default("https://atende.fjntecnologia.com.br/creditos?status=success"),
   STRIPE_CANCEL_URL: z.string().url().optional().default("https://atende.fjntecnologia.com.br/creditos?status=canceled"),
+
+  // Resend (e-mails transacionais)
+  RESEND_API_KEY: z.string().optional().default(""),
+  RESEND_FROM: z.string().optional().default("FJN Atende <noreply@fjntecnologia.com.br>"),
+  RESEND_REPLY_TO: z.string().optional().default("fjntecnologia2022@gmail.com"),
 });
 
 const parsed = schema.safeParse(process.env);

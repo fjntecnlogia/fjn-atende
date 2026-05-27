@@ -4,6 +4,7 @@ import { db } from "../../db/client";
 import { config } from "../../config";
 import { requireTenant } from "../../lib/auth";
 import { getStripe, isStripeEnabled } from "../../lib/stripe";
+import { sendReceiptEmail } from "../../lib/email";
 
 export async function paymentRoutes(app: FastifyInstance) {
   // -----------------------------------------------------------------
@@ -242,4 +243,34 @@ async function handleSessionCompleted(session: any, log: any): Promise<void> {
     { tenant_id: tenantId, amount: amountPaid, bonus, session_id: session.id },
     "Crédito Stripe aplicado",
   );
+
+  // E-mail de recibo — busca dados do owner + saldo atualizado
+  try {
+    const ownerQ = await db.query(
+      `SELECT au.email, au.name
+         FROM admin_users au
+        WHERE au.tenant_id = $1 AND au.role = 'owner'
+        ORDER BY au.id ASC LIMIT 1`,
+      [tenantId],
+    );
+    const balanceQ = await db.query(
+      `SELECT balance_cents FROM tenant_credits WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const owner = ownerQ.rows[0];
+    const balance = Number(balanceQ.rows[0]?.balance_cents ?? 0);
+
+    if (owner) {
+      await sendReceiptEmail({
+        to: owner.email,
+        userName: owner.name,
+        amountCents: amountPaid,
+        bonusCents: bonus,
+        newBalanceCents: balance,
+        paymentId: session.payment_intent ?? session.id,
+      });
+    }
+  } catch (err: any) {
+    log.warn({ err: err.message, session_id: session.id }, "Falha enviando recibo por e-mail");
+  }
 }

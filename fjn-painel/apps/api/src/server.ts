@@ -21,6 +21,7 @@ import { paymentRoutes } from "./modules/credits/payment.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
+import { startLowBalanceWorker, stopLowBalanceWorker } from "./jobs/low-balance-notifier";
 
 const app = Fastify({
   logger: {
@@ -111,6 +112,7 @@ async function bootstrap() {
 
   await startRealtime();
   startCampaignWorker();
+  startLowBalanceWorker();
   await app.listen({ port: config.PORT, host: "0.0.0.0" });
   app.log.info(`FJN Painel API ouvindo na porta ${config.PORT}`);
 }
@@ -118,6 +120,7 @@ async function bootstrap() {
 const shutdown = async (sig: string) => {
   app.log.info(`Sinal ${sig} — encerrando...`);
   stopCampaignWorker();
+  stopLowBalanceWorker();
   await stopRealtime();
   await app.close();
   await shutdownDb();
