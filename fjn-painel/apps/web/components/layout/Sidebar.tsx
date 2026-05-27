@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, MessageSquare, UsersRound, AlertTriangle,
   Settings, LogOut, Smartphone, Crown, Building2, LogIn,
-  Megaphone, Wallet,
+  Megaphone, Wallet, Kanban, Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 const tenantNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/conversas", label: "Conversas", icon: MessageSquare },
+  { href: "/funis",     label: "Funis",     icon: Kanban },
+  { href: "/times",     label: "Times",     icon: Users },
   { href: "/leads",     label: "Leads",     icon: UsersRound },
   { href: "/handoffs",  label: "Handoffs",  icon: AlertTriangle },
   { href: "/whatsapp",  label: "WhatsApp",  icon: Smartphone },
