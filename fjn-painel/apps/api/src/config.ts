@@ -13,6 +13,10 @@ const schema = z.object({
   WEB_URL: z.string().url(),
   ATENDIMENTO_PATH: z.string().default("/opt/fjn-atendimento"),
 
+  // URL pública do fjn-atendimento (recebe webhooks) + token de validação
+  ATENDIMENTO_WEBHOOK_URL: z.string().url().default("http://fjn-atendimento:3001/webhook"),
+  WEBHOOK_TOKEN: z.string().min(8),
+
   // Provider selecionável (espelha fjn-atendimento)
   WHATSAPP_PROVIDER: z.enum(["ultramsg", "evolution", "wppconnect"]).default("wppconnect"),
 

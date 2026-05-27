@@ -100,9 +100,11 @@ export async function instancesRoutes(app: FastifyInstance) {
       const headers = { Authorization: `Bearer ${inst.session_token}` };
 
       // 1. Dispara start-session (assíncrono — WPP retorna rápido, ainda CLOSED)
-      //    NÃO passamos webhook aqui — WPP usa o WEBHOOK_URL global do .env
-      //    (passar `webhook: null` aqui sobrescreve e DESATIVA o webhook!)
+      //    Passamos a URL completa do webhook (mais confiável que confiar
+      //    no WEBHOOK_URL global, que pode estar undefined no momento).
+      const webhookUrl = `${config.ATENDIMENTO_WEBHOOK_URL}?token=${config.WEBHOOK_TOKEN}`;
       await callWpp(inst.session_name, inst.session_token, "/start-session", {
+        webhook: webhookUrl,
         waitQrCode: false,
       });
 
@@ -236,13 +238,13 @@ export async function instancesRoutes(app: FastifyInstance) {
     if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
     const inst = r.rows[0];
 
-    // O WPP-Connect aceita re-config via close-session + start-session (mantém sessão WA)
     try {
-      // Não fecha — usa endpoint dedicado pra atualizar webhook
+      const webhookUrl = `${config.ATENDIMENTO_WEBHOOK_URL}?token=${config.WEBHOOK_TOKEN}`;
       await callWpp(inst.session_name, inst.session_token, "/start-session", {
+        webhook: webhookUrl,
         waitQrCode: false,
       });
-      return { ok: true, msg: "webhook re-registrado via start-session" };
+      return { ok: true, msg: "webhook re-registrado", webhook: webhookUrl };
     } catch (err: any) {
       return reply.code(502).send({ error: err.message });
     }
