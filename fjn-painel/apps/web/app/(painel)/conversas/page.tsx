@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type { Conversation } from "@fjn-painel/shared";
 import { ConversationList } from "./_components/ConversationList";
 import { ConversationThread } from "./_components/ConversationThread";
+import { CardSidebar } from "./_components/CardSidebar";
 
 export default function ConversasPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -58,7 +59,7 @@ export default function ConversasPage() {
         />
       </div>
 
-      {/* Coluna direita: thread */}
+      {/* Coluna central: thread */}
       <div className="flex-1 overflow-hidden">
         {selectedId ? (
           <ConversationThread conversationId={selectedId} onChanged={refetch} />
@@ -68,6 +69,20 @@ export default function ConversasPage() {
           </div>
         )}
       </div>
+
+      {/* Coluna direita: sidebar do funil (card) */}
+      {selectedId && (
+        <div className="w-[320px] border-l border-border overflow-y-auto bg-navy2/30">
+          <div className="p-4 border-b border-border">
+            <h3 className="font-display font-bold text-sm uppercase tracking-widest text-light/80">
+              Funil
+            </h3>
+          </div>
+          <div className="p-4">
+            <CardSidebar conversationId={selectedId} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
