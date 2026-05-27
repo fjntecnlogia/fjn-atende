@@ -155,10 +155,16 @@ export async function paymentRoutes(app: FastifyInstance) {
       req.log.info({ event_type: event.type, id: event.id }, "Stripe webhook recebido");
 
       switch (event.type) {
+        // ============ Checkout (compra de crédito pré-pago) ============
         case "checkout.session.completed":
         case "checkout.session.async_payment_succeeded": {
           const session = event.data.object as any;
-          await handleSessionCompleted(session, req.log);
+          // Distingue checkout de subscription (sub) vs payment (compra avulsa)
+          if (session.mode === "subscription") {
+            await handleSubscriptionCheckout(session, req.log);
+          } else {
+            await handleSessionCompleted(session, req.log);
+          }
           break;
         }
 
@@ -177,6 +183,32 @@ export async function paymentRoutes(app: FastifyInstance) {
             `UPDATE stripe_checkout_sessions SET status = 'failed' WHERE session_id = $1`,
             [session.id],
           );
+          break;
+        }
+
+        // ============ Subscriptions (planos recorrentes) ============
+        case "customer.subscription.created":
+        case "customer.subscription.updated": {
+          const sub = event.data.object as any;
+          await handleSubscriptionUpdated(sub, req.log);
+          break;
+        }
+
+        case "customer.subscription.deleted": {
+          const sub = event.data.object as any;
+          await handleSubscriptionDeleted(sub, req.log);
+          break;
+        }
+
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object as any;
+          await handleInvoicePaid(invoice, req.log);
+          break;
+        }
+
+        case "invoice.payment_failed": {
+          const invoice = event.data.object as any;
+          await handleInvoiceFailed(invoice, req.log);
           break;
         }
       }
@@ -244,6 +276,7 @@ async function handleSessionCompleted(session: any, log: any): Promise<void> {
     "Crédito Stripe aplicado",
   );
 
+  // E-mail de recibo (mantém implementação anterior abaixo)
   // E-mail de recibo — busca dados do owner + saldo atualizado
   try {
     const ownerQ = await db.query(
@@ -272,5 +305,196 @@ async function handleSessionCompleted(session: any, log: any): Promise<void> {
     }
   } catch (err: any) {
     log.warn({ err: err.message, session_id: session.id }, "Falha enviando recibo por e-mail");
+  }
+}
+
+// =====================================================================
+// SUBSCRIPTIONS — handlers
+// =====================================================================
+
+/**
+ * Quando checkout em modo subscription completa.
+ * Stripe já criou a subscription. Vamos salvar IDs e ativar tenant.
+ */
+async function handleSubscriptionCheckout(session: any, log: any): Promise<void> {
+  const tenantId = Number(session.metadata?.tenant_id ?? session.client_reference_id);
+  if (!tenantId) {
+    log.error({ session_id: session.id }, "subscription sem tenant_id");
+    return;
+  }
+
+  if (!session.subscription) {
+    log.warn({ session_id: session.id }, "checkout subscription sem subscription_id ainda");
+    return;
+  }
+
+  // Sub real virá no customer.subscription.created — aqui só guardamos o customer
+  await db.query(
+    `UPDATE tenant_subscriptions
+        SET stripe_customer_id = $1, updated_at = NOW()
+      WHERE tenant_id = $2`,
+    [session.customer, tenantId],
+  );
+
+  log.info({ tenant_id: tenantId, session_id: session.id }, "Subscription checkout completou");
+}
+
+/**
+ * customer.subscription.created / updated
+ * Sincroniza status, período, plan.
+ */
+async function handleSubscriptionUpdated(sub: any, log: any): Promise<void> {
+  const tenantId = Number(sub.metadata?.tenant_id);
+  if (!tenantId) {
+    log.warn({ sub_id: sub.id }, "subscription sem tenant_id no metadata");
+    return;
+  }
+
+  // Acha plan_id pelo stripe_price_id
+  const priceId = sub.items?.data?.[0]?.price?.id;
+  const planRes = await db.query(
+    `SELECT id FROM subscription_plans WHERE stripe_price_id = $1`,
+    [priceId],
+  );
+  const planId = planRes.rows[0]?.id ?? Number(sub.metadata?.plan_id);
+
+  await db.query(
+    `INSERT INTO tenant_subscriptions
+       (tenant_id, plan_id, stripe_customer_id, stripe_subscription_id, stripe_price_id,
+        status, current_period_start, current_period_end, cancel_at_period_end)
+     VALUES ($1, $2, $3, $4, $5, $6, to_timestamp($7), to_timestamp($8), $9)
+     ON CONFLICT (tenant_id) DO UPDATE SET
+       plan_id = EXCLUDED.plan_id,
+       stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+       stripe_price_id = EXCLUDED.stripe_price_id,
+       status = EXCLUDED.status,
+       current_period_start = EXCLUDED.current_period_start,
+       current_period_end = EXCLUDED.current_period_end,
+       cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+       updated_at = NOW()`,
+    [
+      tenantId, planId, sub.customer, sub.id, priceId,
+      sub.status, sub.current_period_start, sub.current_period_end,
+      sub.cancel_at_period_end ?? false,
+    ],
+  );
+
+  // Ativa tenant se sub está active
+  if (sub.status === "active") {
+    await db.query(
+      `UPDATE tenants SET status = 'active' WHERE id = $1`,
+      [tenantId],
+    );
+  } else if (sub.status === "past_due" || sub.status === "unpaid") {
+    // Bloqueio imediato em falha de pagamento
+    await db.query(
+      `UPDATE tenants SET status = 'past_due' WHERE id = $1`,
+      [tenantId],
+    );
+  }
+
+  await db.query(
+    `INSERT INTO subscription_events (tenant_id, event_type, stripe_event_id, to_plan_id)
+     VALUES ($1, $2, $3, $4)`,
+    [tenantId, `sub_${sub.status}`, sub.id, planId],
+  );
+
+  log.info({ tenant_id: tenantId, status: sub.status, sub_id: sub.id },
+           "Subscription sincronizada");
+}
+
+/**
+ * customer.subscription.deleted
+ */
+async function handleSubscriptionDeleted(sub: any, log: any): Promise<void> {
+  const tenantId = Number(sub.metadata?.tenant_id);
+  if (!tenantId) return;
+
+  await db.query(
+    `UPDATE tenant_subscriptions
+        SET status = 'canceled', canceled_at = NOW(), updated_at = NOW()
+      WHERE stripe_subscription_id = $1`,
+    [sub.id],
+  );
+
+  // Tenant volta pra pending_payment (não bloqueia hard ainda — current_period_end ainda válido)
+  await db.query(
+    `UPDATE tenants SET status = 'pending_payment' WHERE id = $1`,
+    [tenantId],
+  );
+
+  await db.query(
+    `INSERT INTO subscription_events (tenant_id, event_type, stripe_event_id)
+     VALUES ($1, 'canceled', $2)`,
+    [tenantId, sub.id],
+  );
+
+  log.info({ tenant_id: tenantId, sub_id: sub.id }, "Subscription cancelada");
+}
+
+/**
+ * invoice.payment_succeeded — pagamento bateu, reseta cota de uso
+ */
+async function handleInvoicePaid(invoice: any, log: any): Promise<void> {
+  if (!invoice.subscription) return;
+
+  // Reseta cota do ciclo
+  await db.query(
+    `UPDATE tenant_subscriptions
+        SET ai_messages_used = 0, campaign_msgs_used = 0,
+            status = 'active', updated_at = NOW()
+      WHERE stripe_subscription_id = $1`,
+    [invoice.subscription],
+  );
+
+  const subRes = await db.query(
+    `SELECT tenant_id FROM tenant_subscriptions WHERE stripe_subscription_id = $1`,
+    [invoice.subscription],
+  );
+  if (subRes.rowCount && subRes.rows[0]) {
+    const tenantId = subRes.rows[0].tenant_id;
+    await db.query(
+      `UPDATE tenants SET status = 'active' WHERE id = $1`,
+      [tenantId],
+    );
+    await db.query(
+      `INSERT INTO subscription_events (tenant_id, event_type, stripe_event_id, amount_cents)
+       VALUES ($1, 'payment_succeeded', $2, $3)`,
+      [tenantId, invoice.id, invoice.amount_paid ?? 0],
+    );
+    log.info({ tenant_id: tenantId, invoice_id: invoice.id, amount: invoice.amount_paid },
+             "Invoice paga + cotas resetadas");
+  }
+}
+
+/**
+ * invoice.payment_failed — bloqueio imediato
+ */
+async function handleInvoiceFailed(invoice: any, log: any): Promise<void> {
+  if (!invoice.subscription) return;
+
+  await db.query(
+    `UPDATE tenant_subscriptions
+        SET status = 'past_due', updated_at = NOW()
+      WHERE stripe_subscription_id = $1`,
+    [invoice.subscription],
+  );
+
+  const subRes = await db.query(
+    `SELECT tenant_id FROM tenant_subscriptions WHERE stripe_subscription_id = $1`,
+    [invoice.subscription],
+  );
+  if (subRes.rowCount && subRes.rows[0]) {
+    const tenantId = subRes.rows[0].tenant_id;
+    await db.query(
+      `UPDATE tenants SET status = 'past_due' WHERE id = $1`,
+      [tenantId],
+    );
+    await db.query(
+      `INSERT INTO subscription_events (tenant_id, event_type, stripe_event_id, amount_cents)
+       VALUES ($1, 'payment_failed', $2, $3)`,
+      [tenantId, invoice.id, invoice.amount_due ?? 0],
+    );
+    log.warn({ tenant_id: tenantId, invoice_id: invoice.id }, "Invoice falhou — tenant bloqueado");
   }
 }

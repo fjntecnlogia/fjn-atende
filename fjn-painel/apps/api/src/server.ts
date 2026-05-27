@@ -22,6 +22,7 @@ import { pipelinesRoutes } from "./modules/funnel/pipelines.routes";
 import { teamsRoutes } from "./modules/funnel/teams.routes";
 import { cardsRoutes } from "./modules/funnel/cards.routes";
 import { funnelMetricsRoutes } from "./modules/funnel/metrics.routes";
+import { billingRoutes } from "./modules/billing/billing.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
@@ -114,6 +115,23 @@ async function bootstrap() {
   app.register(teamsRoutes,         { prefix: "/teams" });
   app.register(cardsRoutes,         { prefix: "/cards" });
   app.register(funnelMetricsRoutes, { prefix: "/funnel-metrics" });
+
+  // Módulo Billing (Stripe Subscriptions)
+  // Routes: GET /plans (público), GET /billing/subscription, POST /billing/checkout,
+  //         POST /billing/portal, POST /billing/cancel, POST /billing/reactivate,
+  //         POST /billing/change-plan
+  app.register(billingRoutes, { prefix: "/billing" });
+  // Atalho público pra GET /plans (sem prefix /billing pra facilitar landing)
+  app.get("/plans", async () => {
+    const { db } = await import("./db/client");
+    const r = await db.query(
+      `SELECT id, slug, name, tier, billing_cycle, price_cents,
+              max_instances, max_users, max_pipelines, max_teams,
+              included_ai_messages, included_campaign_msgs, features, sort_order
+         FROM subscription_plans WHERE is_active = TRUE ORDER BY sort_order ASC`,
+    );
+    return { items: r.rows };
+  });
 
   app.setErrorHandler((err, _req, reply) => {
     app.log.error(err);
