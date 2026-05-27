@@ -41,8 +41,14 @@ ENV NODE_ENV=development
 RUN git clone --depth 1 https://github.com/wppconnect-team/wppconnect-server.git .
 
 # Instala TUDO (incluindo devDeps pra ter o tsc)
-RUN npm install --legacy-peer-deps && \
+RUN npm install --legacy-peer-deps --include=dev && \
     npm install sharp --ignore-scripts --legacy-peer-deps || true
+
+# Garante que types necessários estão presentes (Alpine às vezes pula)
+RUN npm install --save-dev --legacy-peer-deps \
+    @types/jest \
+    @types/node \
+    typescript
 
 # Backup: TypeScript global (alguns npm installs não populam o PATH)
 RUN npm install -g typescript@5
