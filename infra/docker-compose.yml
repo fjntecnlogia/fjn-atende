@@ -77,13 +77,11 @@ services:
     environment:
       SECRET_KEY: ${WPPCONNECT_SECRET_KEY:?precisa definir WPPCONNECT_SECRET_KEY no .env}
       LOG_LEVEL: info
-      # Webhook desabilitado por enquanto — vamos configurar via API depois
-      # que o QR estiver funcionando, pra evitar crash no callWebHook
-      # WEBHOOK_URL: http://fjn-atendimento:3001/webhook?token=${WEBHOOK_TOKEN}
+      # Webhook global — para onde TODA mensagem recebida é enviada
+      WEBHOOK_URL: http://fjn-atendimento:3001/webhook?token=${WEBHOOK_TOKEN}
+      WEBHOOK_ALL_UNREAD_ON_START: "false"
+      WEBHOOK_WAIT_FOR: "true"
       DELETE_SESSION_DIR_ON_LOGOUT: "true"
-      # Tenta desabilitar auto-close (env var pode ser ignorada por algumas imagens)
-      AUTO_CLOSE: "0"
-      WHATSAPP_AUTO_CLOSE: "0"
     volumes:
       - wppconnect_tokens:/usr/src/wpp-server/tokens
       - wppconnect_userdata:/usr/src/wpp-server/userDataDir
