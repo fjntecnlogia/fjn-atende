@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
+import multipart from "@fastify/multipart";
 import { config } from "./config";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { dashboardRoutes } from "./modules/dashboard/dashboard.routes";
@@ -12,8 +13,13 @@ import { handoffsRoutes } from "./modules/handoffs/handoffs.routes";
 import { configRoutes } from "./modules/config/config.routes";
 import { tenantsRoutes } from "./modules/tenants/tenants.routes";
 import { instancesRoutes } from "./modules/instances/instances.routes";
+import { contactListsRoutes } from "./modules/campaigns/contact-lists.routes";
+import { templatesRoutes } from "./modules/campaigns/templates.routes";
+import { campaignsRoutes } from "./modules/campaigns/campaigns.routes";
+import { creditsRoutes } from "./modules/credits/credits.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
+import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
 
 const app = Fastify({
   logger: {
@@ -41,6 +47,9 @@ async function bootstrap() {
   await app.register(jwt, { secret: config.JWT_SECRET, sign: { expiresIn: config.JWT_EXPIRES } });
   await app.register(rateLimit, { max: 600, timeWindow: "1 minute" });
   await app.register(websocket);
+  await app.register(multipart, {
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max upload (CSV)
+  });
 
   app.get("/health", async () => ({ ok: true, ts: Date.now() }));
 
@@ -68,8 +77,14 @@ async function bootstrap() {
   app.register(leadsRoutes,         { prefix: "/leads" });
   app.register(handoffsRoutes,      { prefix: "/handoffs" });
   app.register(configRoutes,        { prefix: "/config" });
-  app.register(tenantsRoutes,       { prefix: "/tenants" });   // super-admin only
-  app.register(instancesRoutes,     { prefix: "/instances" }); // WhatsApp por tenant
+  app.register(tenantsRoutes,       { prefix: "/tenants" });
+  app.register(instancesRoutes,     { prefix: "/instances" });
+
+  // Módulo Campanhas (FJN Disparo)
+  app.register(contactListsRoutes,  { prefix: "/contact-lists" });
+  app.register(templatesRoutes,     { prefix: "/templates" });
+  app.register(campaignsRoutes,     { prefix: "/campaigns" });
+  app.register(creditsRoutes,       { prefix: "/credits" });
 
   app.setErrorHandler((err, _req, reply) => {
     app.log.error(err);
@@ -77,12 +92,14 @@ async function bootstrap() {
   });
 
   await startRealtime();
+  startCampaignWorker();
   await app.listen({ port: config.PORT, host: "0.0.0.0" });
   app.log.info(`FJN Painel API ouvindo na porta ${config.PORT}`);
 }
 
 const shutdown = async (sig: string) => {
   app.log.info(`Sinal ${sig} — encerrando...`);
+  stopCampaignWorker();
   await stopRealtime();
   await app.close();
   await shutdownDb();

@@ -165,6 +165,132 @@ export interface TenantUsage {
   conversations: number;
   ai_input_tokens: number;
   ai_output_tokens: number;
+  campaign_messages_sent?: number;
+}
+
+// ---------------------------------------------------------------------
+// Campanhas (FJN Disparo)
+// ---------------------------------------------------------------------
+
+export type CampaignProvider = "wppconnect" | "meta_cloud" | "evolution" | "ultramsg";
+export type CampaignStatus =
+  | "draft" | "scheduled" | "running" | "paused"
+  | "completed" | "canceled" | "failed";
+export type RecipientStatus =
+  | "pending" | "queued" | "sending" | "sent"
+  | "delivered" | "read" | "failed" | "skipped" | "opted_out";
+
+export interface ContactList {
+  id: number;
+  tenant_id: number;
+  name: string;
+  description: string | null;
+  source: string | null;
+  total_count: number;
+  optin_count: number;
+  optout_count: number;
+  created_at: string;
+}
+
+export interface ContactListItem {
+  id: number;
+  tenant_id: number;
+  list_id: number;
+  phone: string;
+  name: string | null;
+  email: string | null;
+  variables: Record<string, string>;
+  opted_in: boolean;
+  opted_in_at: string | null;
+  opted_out: boolean;
+  opted_out_at: string | null;
+  opted_out_reason: string | null;
+  phone_valid: boolean;
+  last_message_status: string | null;
+  last_message_at: string | null;
+}
+
+export interface MessageTemplate {
+  id: number;
+  tenant_id: number;
+  name: string;
+  category: "marketing" | "authentication" | "utility";
+  body: string;
+  media_type: "image" | "video" | "document" | null;
+  media_url: string | null;
+  meta_template_name: string | null;
+  meta_template_status: "pending" | "approved" | "rejected" | null;
+  meta_language: string;
+}
+
+export interface Campaign {
+  id: number;
+  tenant_id: number;
+  name: string;
+  provider: CampaignProvider;
+  instance_id: number | null;
+  list_id: number | null;
+  template_id: number | null;
+  custom_body: string | null;
+  media_type: string | null;
+  media_url: string | null;
+  status: CampaignStatus;
+  scheduled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  rate_per_min: number;
+  jitter_seconds: number;
+  filters: { only_opted_in?: boolean; exclude_opted_out?: boolean };
+  total_count: number;
+  sent_count: number;
+  delivered_count: number;
+  read_count: number;
+  failed_count: number;
+  opted_out_count: number;
+  auto_pause_on_block_pct: number | null;
+  created_at: string;
+}
+
+export interface CampaignRecipient {
+  id: number;
+  campaign_id: number;
+  phone: string;
+  name: string | null;
+  status: RecipientStatus;
+  external_id: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  failed_at: string | null;
+  failed_reason: string | null;
+  attempts: number;
+}
+
+export interface TenantCredits {
+  tenant_id: number;
+  balance_cents: number;
+  total_purchased_cents: number;
+  total_spent_cents: number;
+  auto_recharge: boolean;
+  auto_recharge_threshold_cents: number;
+  auto_recharge_amount_cents: number;
+}
+
+export interface CreditTransaction {
+  id: number;
+  tenant_id: number;
+  kind: "purchase" | "debit" | "refund" | "bonus" | "manual";
+  amount_cents: number;
+  balance_after_cents: number;
+  description: string | null;
+  campaign_id: number | null;
+  payment_provider: string | null;
+  created_at: string;
+}
+
+export interface MessagePricing {
+  provider: CampaignProvider;
+  price_cents: number;
 }
 
 // ---------------------------------------------------------------------
