@@ -62,6 +62,18 @@ export async function getOrCreateActiveConversation(tenantId: number, contactId:
      RETURNING id, bot_paused_until, status`,
     [tenantId, contactId],
   );
+
+  // Auto-cria card no pipeline default do tenant (FUNIL CRM)
+  // Não bloqueia o fluxo se falhar (try/catch silencioso)
+  try {
+    await db.query(
+      `SELECT create_default_card_for_conversation($1, $2)`,
+      [created.rows[0].id, tenantId],
+    );
+  } catch (err: any) {
+    console.warn(`[funnel] Falha ao auto-criar card conv=${created.rows[0].id}:`, err.message);
+  }
+
   return created.rows[0];
 }
 
