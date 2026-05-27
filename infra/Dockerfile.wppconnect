@@ -44,6 +44,12 @@ RUN git clone --depth 1 https://github.com/wppconnect-team/wppconnect-server.git
 RUN npm install --legacy-peer-deps && \
     npm install sharp --ignore-scripts --legacy-peer-deps || true
 
+# Backup: TypeScript global (alguns npm installs não populam o PATH)
+RUN npm install -g typescript@5
+
+# Confirma que tsc está disponível antes de buildar
+RUN which tsc && tsc --version
+
 # Build TS (tsc + JS)
 RUN npm run build
 
