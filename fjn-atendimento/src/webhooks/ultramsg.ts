@@ -5,6 +5,7 @@ import { bufferMessage } from "../core/conversation";
 import { scheduleProcessing } from "../core/processor";
 import { transcribeAudio, describeImage } from "../services/media";
 import { getWhatsAppProvider } from "../services/whatsapp";
+import { handleOptOutIfMatch } from "../core/opt-out";
 
 /**
  * Webhook unificado multi-tenant.
@@ -70,6 +71,18 @@ export async function registerWhatsAppWebhook(app: FastifyInstance) {
         if (t.rowCount === 0 || t.rows[0].status !== "active") {
           req.log.warn({ tenantId }, "tenant inativo — mensagem descartada");
           return;
+        }
+
+        // ─── OPT-OUT AUTOMÁTICO ────────────────────────────────────
+        // Antes de qualquer processamento, checa se é pedido de opt-out.
+        // Se for, marca em todas as listas + cancela campanhas + responde.
+        // NÃO chama IA pra evitar respostas tipo "como assim parar?".
+        if (msg.type === "chat" && msg.body) {
+          const optedOut = await handleOptOutIfMatch(tenantId, msg.phone, msg.body);
+          if (optedOut) {
+            req.log.info({ tenantId, phone: msg.phone }, "Opt-out aplicado");
+            return; // Stop processing — não chama IA
+          }
         }
 
         let content = "";

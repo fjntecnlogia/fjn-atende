@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Megaphone, FolderOpen, FileText, Plus, Play, Pause, CheckCircle2, XCircle } from "lucide-react";
+import { Megaphone, FolderOpen, FileText, Plus, Play, Pause, CheckCircle2, XCircle, Ban } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { relativeTime } from "@/lib/utils";
@@ -40,6 +40,9 @@ export default function CampanhasPage() {
           </Link>
           <Link href="/campanhas/templates" className="btn-ghost flex items-center gap-2">
             <FileText size={14} /> Templates
+          </Link>
+          <Link href="/campanhas/optouts" className="btn-ghost flex items-center gap-2">
+            <Ban size={14} /> Opt-outs
           </Link>
           <Link href="/campanhas/nova" className="btn-primary flex items-center gap-2">
             <Plus size={14} /> Nova campanha

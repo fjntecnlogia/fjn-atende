@@ -350,4 +350,67 @@ export async function contactListsRoutes(app: FastifyInstance) {
     if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
     return { ok: true };
   });
+
+  // ---------------------------------------------------------------
+  // GET /contact-lists/_meta/optout-events  — auditoria de opt-outs
+  // ---------------------------------------------------------------
+  app.get("/_meta/optout-events", async (req) => {
+    const q = z.object({
+      limit: z.coerce.number().default(50),
+      since_days: z.coerce.number().default(90),
+    }).parse(req.query);
+
+    const r = await db.query(
+      `SELECT id, phone, source, lists_updated_count, campaigns_affected, created_at
+         FROM optout_events
+        WHERE tenant_id = $1
+          AND created_at >= NOW() - ($2 || ' days')::interval
+        ORDER BY created_at DESC
+        LIMIT $3`,
+      [req.tenantId!, q.since_days, q.limit],
+    );
+    return r.rows;
+  });
+
+  // ---------------------------------------------------------------
+  // POST /contact-lists/_meta/manual-optout
+  // Admin remove manualmente um telefone de TODAS as listas do tenant
+  // (atende pedidos de opt-out por outros canais — e-mail, telefone, etc)
+  // ---------------------------------------------------------------
+  app.post("/_meta/manual-optout", async (req) => {
+    const body = z.object({
+      phone: z.string().min(8),
+      reason: z.string().max(120).optional(),
+    }).parse(req.body);
+    const phone = body.phone.replace(/\D/g, "");
+
+    const lists = await db.query(
+      `UPDATE contact_list_items
+          SET opted_out = TRUE, opted_out_at = NOW(), opted_out_reason = $3
+        WHERE tenant_id = $1 AND phone = $2 AND opted_out = FALSE
+        RETURNING id`,
+      [req.tenantId!, phone, body.reason ?? "manual_admin"],
+    );
+    const campaigns = await db.query(
+      `UPDATE campaign_recipients
+          SET status = 'opted_out'
+        WHERE tenant_id = $1 AND phone = $2 AND status = 'pending'
+        RETURNING id`,
+      [req.tenantId!, phone],
+    );
+
+    await db.query(
+      `INSERT INTO optout_events
+        (tenant_id, phone, source, lists_updated_count, campaigns_affected)
+       VALUES ($1, $2, 'manual_admin', $3, $4)`,
+      [req.tenantId!, phone, lists.rowCount ?? 0, campaigns.rowCount ?? 0],
+    );
+
+    return {
+      ok: true,
+      phone,
+      lists_updated: lists.rowCount ?? 0,
+      campaigns_canceled: campaigns.rowCount ?? 0,
+    };
+  });
 }
