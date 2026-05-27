@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, MessageSquare, UsersRound, AlertTriangle,
   Settings, LogOut, Smartphone, Crown, Building2, LogIn,
-  Megaphone, Wallet, Kanban, Users, CreditCard,
+  Megaphone, Wallet, Kanban, Users, CreditCard, Palette,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,8 @@ const tenantNav = [
   { href: "/whatsapp",  label: "WhatsApp",  icon: Smartphone },
   { href: "/campanhas", label: "Campanhas", icon: Megaphone, group: "disparo" },
   { href: "/creditos",  label: "Créditos",  icon: Wallet,    group: "disparo" },
-  { href: "/configuracoes/plano", label: "Plano", icon: CreditCard },
+  { href: "/configuracoes/plano",    label: "Plano",    icon: CreditCard },
+  { href: "/configuracoes/branding", label: "Branding", icon: Palette },
   { href: "/config",    label: "Config IA", icon: Settings },
 ];
 

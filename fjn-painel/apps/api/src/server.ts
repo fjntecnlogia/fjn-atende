@@ -23,6 +23,7 @@ import { teamsRoutes } from "./modules/funnel/teams.routes";
 import { cardsRoutes } from "./modules/funnel/cards.routes";
 import { funnelMetricsRoutes } from "./modules/funnel/metrics.routes";
 import { billingRoutes } from "./modules/billing/billing.routes";
+import { brandingRoutes } from "./modules/branding/branding.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
@@ -152,6 +153,9 @@ async function bootstrap() {
   //         POST /billing/portal, POST /billing/cancel, POST /billing/reactivate,
   //         POST /billing/change-plan
   app.register(billingRoutes, { prefix: "/billing" });
+
+  // Módulo Branding (white-label)
+  app.register(brandingRoutes, { prefix: "/branding" });
   // Atalho público pra GET /plans (sem prefix /billing pra facilitar landing)
   app.get("/plans", async () => {
     const { db } = await import("./db/client");
