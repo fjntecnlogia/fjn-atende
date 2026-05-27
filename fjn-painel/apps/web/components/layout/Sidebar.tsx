@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, MessageSquare, UsersRound, AlertTriangle,
   Settings, LogOut, Smartphone, Crown, Building2, LogIn,
+  Megaphone, Wallet,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,8 @@ const tenantNav = [
   { href: "/leads",     label: "Leads",     icon: UsersRound },
   { href: "/handoffs",  label: "Handoffs",  icon: AlertTriangle },
   { href: "/whatsapp",  label: "WhatsApp",  icon: Smartphone },
+  { href: "/campanhas", label: "Campanhas", icon: Megaphone, group: "disparo" },
+  { href: "/creditos",  label: "Créditos",  icon: Wallet,    group: "disparo" },
   { href: "/config",    label: "Config IA", icon: Settings },
 ];
 
