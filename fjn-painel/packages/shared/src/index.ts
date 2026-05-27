@@ -3,7 +3,7 @@
 // =====================================================================
 
 export type Plan = "trial" | "starter" | "pro" | "enterprise";
-export type TenantStatus = "active" | "suspended" | "canceled";
+export type TenantStatus = "active" | "pending_payment" | "past_due" | "suspended" | "canceled";
 export type AdminRole = "super_admin" | "owner" | "admin" | "agent";
 export type ConversationStatus = "active" | "paused" | "closed";
 export type MessageRole = "user" | "assistant" | "system" | "human_agent";

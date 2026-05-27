@@ -27,6 +27,31 @@ import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
 import { startLowBalanceWorker, stopLowBalanceWorker } from "./jobs/low-balance-notifier";
+import { requireActiveTenant } from "./lib/auth";
+
+// =====================================================================
+// Billing Gate — rotas que EXIGEM tenant.status='active'
+// Super-admin sempre passa. Tudo abaixo dispara middleware requireActiveTenant.
+// =====================================================================
+const BILLING_GATED_PREFIXES = [
+  "/conversations",
+  "/leads",
+  "/handoffs",
+  "/instances",
+  "/contact-lists",
+  "/templates",
+  "/campaigns",
+  "/pipelines",
+  "/teams",
+  "/cards",
+  "/funnel-metrics",
+];
+
+function isBillingGated(url: string): boolean {
+  // Ignora query string
+  const path = url.split("?")[0];
+  return BILLING_GATED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
+}
 
 const app = Fastify({
   logger: {
@@ -75,6 +100,12 @@ async function bootstrap() {
   );
 
   app.get("/health", async () => ({ ok: true, ts: Date.now() }));
+
+  // Billing Gate: aplica requireActiveTenant em rotas operacionais
+  app.addHook("preHandler", async (req, reply) => {
+    if (!isBillingGated(req.url)) return;
+    await requireActiveTenant(req as any, reply as any);
+  });
 
   app.get("/ws", { websocket: true }, (conn, req) => {
     const token = (req.query as any)?.token as string | undefined;
