@@ -45,7 +45,8 @@ RUN npm install --legacy-peer-deps --include=dev && \
     npm install sharp --ignore-scripts --legacy-peer-deps || true
 
 # Garante que types necessários estão presentes (Alpine às vezes pula)
-RUN npm install --save-dev --legacy-peer-deps \
+# --ignore-scripts evita rebuild do sharp (que precisaria de node-gyp)
+RUN npm install --save-dev --legacy-peer-deps --ignore-scripts \
     @types/jest \
     @types/node \
     typescript
