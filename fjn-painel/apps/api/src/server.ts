@@ -17,6 +17,7 @@ import { contactListsRoutes } from "./modules/campaigns/contact-lists.routes";
 import { templatesRoutes } from "./modules/campaigns/templates.routes";
 import { campaignsRoutes } from "./modules/campaigns/campaigns.routes";
 import { creditsRoutes } from "./modules/credits/credits.routes";
+import { paymentRoutes } from "./modules/credits/payment.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
@@ -50,6 +51,22 @@ async function bootstrap() {
   await app.register(multipart, {
     limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max upload (CSV)
   });
+
+  // Captura raw body só pra rotas com config.rawBody = true (Stripe webhook)
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "buffer" },
+    function (req, body: any, done) {
+      try {
+        const text = body.toString("utf-8");
+        (req as any).rawBody = text;
+        done(null, text ? JSON.parse(text) : {});
+      } catch (err: any) {
+        err.statusCode = 400;
+        done(err, undefined);
+      }
+    },
+  );
 
   app.get("/health", async () => ({ ok: true, ts: Date.now() }));
 
@@ -85,6 +102,7 @@ async function bootstrap() {
   app.register(templatesRoutes,     { prefix: "/templates" });
   app.register(campaignsRoutes,     { prefix: "/campaigns" });
   app.register(creditsRoutes,       { prefix: "/credits" });
+  app.register(paymentRoutes,       { prefix: "/credits" });   // /credits/checkout, /credits/stripe-webhook
 
   app.setErrorHandler((err, _req, reply) => {
     app.log.error(err);

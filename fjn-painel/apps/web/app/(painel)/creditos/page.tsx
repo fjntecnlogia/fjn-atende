@@ -1,7 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Wallet, ArrowDownToLine, ArrowUpFromLine, Gift, History } from "lucide-react";
+import { useEffect } from "react";
+import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Wallet, ArrowDownToLine, ArrowUpFromLine, Gift, History, Plus } from "lucide-react";
+import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { Badge } from "@/components/ui/Badge";
@@ -19,6 +23,10 @@ const kindLabels: Record<string, { label: string; color: string; icon: any }> = 
 };
 
 export default function CreditosPage() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const qc = useQueryClient();
+
   const { data: balance } = useQuery<any>({
     queryKey: ["credits-me"],
     queryFn: async () => (await api.get("/credits/me")).data,
@@ -31,14 +39,33 @@ export default function CreditosPage() {
     refetchInterval: 15_000,
   });
 
+  // Toast quando volta do Stripe Checkout
+  useEffect(() => {
+    const status = params.get("status");
+    if (status === "success") {
+      toast.success("Pagamento recebido! Crédito sendo aplicado...", { duration: 6000 });
+      qc.invalidateQueries({ queryKey: ["credits-me"] });
+      qc.invalidateQueries({ queryKey: ["credits-tx"] });
+      router.replace("/creditos");
+    } else if (status === "canceled") {
+      toast("Pagamento cancelado", { icon: "⚠️" });
+      router.replace("/creditos");
+    }
+  }, [params, router, qc]);
+
   return (
     <div className="p-8 space-y-6">
-      <div>
-        <h1 className="font-display text-3xl font-extrabold flex items-center gap-3">
-          <Wallet className="text-orange" />
-          Créditos
-        </h1>
-        <p className="text-sm text-gray2 mt-1">Saldo pré-pago para envio de campanhas</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-extrabold flex items-center gap-3">
+            <Wallet className="text-orange" />
+            Créditos
+          </h1>
+          <p className="text-sm text-gray2 mt-1">Saldo pré-pago para envio de campanhas</p>
+        </div>
+        <Link href="/creditos/comprar" className="btn-primary flex items-center gap-2">
+          <Plus size={14} /> Comprar créditos
+        </Link>
       </div>
 
       {/* KPIs */}

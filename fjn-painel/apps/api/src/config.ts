@@ -34,6 +34,12 @@ const schema = z.object({
   WPPCONNECT_SECRET_KEY: z.string().optional().default(""),
   WPPCONNECT_SESSION: z.string().optional().default("fjn-atendimento"),
   WPPCONNECT_SESSION_TOKEN: z.string().optional().default(""),
+
+  // Stripe (compra de créditos pré-pagos)
+  STRIPE_SECRET_KEY: z.string().optional().default(""),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(""),
+  STRIPE_SUCCESS_URL: z.string().url().optional().default("https://atende.fjntecnologia.com.br/creditos?status=success"),
+  STRIPE_CANCEL_URL: z.string().url().optional().default("https://atende.fjntecnologia.com.br/creditos?status=canceled"),
 });
 
 const parsed = schema.safeParse(process.env);
