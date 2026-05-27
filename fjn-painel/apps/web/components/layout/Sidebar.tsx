@@ -5,9 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, MessageSquare, UsersRound, AlertTriangle,
   Settings, LogOut, Smartphone, Crown, Building2, LogIn,
-  Megaphone, Wallet, Kanban, Users, CreditCard, Palette,
+  Megaphone, Wallet, Kanban, Users, CreditCard, Palette, DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useTenantBranding } from "@/app/providers";
 import { cn } from "@/lib/utils";
 
 const tenantNav = [
@@ -27,6 +28,7 @@ const tenantNav = [
 
 const superAdminNav = [
   { href: "/admin",          label: "Visão Geral", icon: Crown },
+  { href: "/admin/billing",  label: "Billing",     icon: DollarSign },
   { href: "/admin/tenants",  label: "Tenants",     icon: Building2 },
   { href: "/admin/planos",   label: "Planos",      icon: CreditCard },
 ];
@@ -35,7 +37,13 @@ export function Sidebar({ realtimeConnected = false }: { realtimeConnected?: boo
   const pathname = usePathname();
   const router = useRouter();
   const { user, tenant, activeTenantId, logout, setActiveTenant } = useAuth();
+  const tenantBranding = useTenantBranding();
   const isSuperAdmin = user?.role === "super_admin";
+
+  // Branding ativo: tenant detectado pelo host (white-label) ou padrão FJN
+  const brandLogo = tenantBranding?.branding?.logo_url;
+  const brandName = tenantBranding?.branding?.company_name_override ?? tenantBranding?.name;
+  const hideFJN = tenantBranding?.hide_fjn_branding;
 
   function handleLogout() {
     logout();
@@ -51,10 +59,21 @@ export function Sidebar({ realtimeConnected = false }: { realtimeConnected?: boo
   return (
     <aside className="w-[240px] min-h-screen bg-navy2 border-r border-border flex flex-col">
       <div className="h-16 flex items-center px-6 border-b border-border">
-        <div className="font-display font-extrabold tracking-tight text-lg leading-none">
-          <span className="text-orange">FJN</span>
-          <span className="text-light"> Atende</span>
-        </div>
+        {brandLogo ? (
+          <div className="flex items-center gap-2">
+            <img src={brandLogo} alt={brandName ?? "Logo"}
+                 className="h-8 w-auto max-w-[150px] object-contain" />
+          </div>
+        ) : hideFJN && brandName ? (
+          <div className="font-display font-extrabold tracking-tight text-lg leading-none text-light">
+            {brandName}
+          </div>
+        ) : (
+          <div className="font-display font-extrabold tracking-tight text-lg leading-none">
+            <span className="text-orange">FJN</span>
+            <span className="text-light"> Atende</span>
+          </div>
+        )}
       </div>
 
       {/* Indicador de impersonation pra super-admin */}

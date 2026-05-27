@@ -273,6 +273,104 @@ export async function billingRoutes(app: FastifyInstance) {
   });
 
   // ===================================================================
+  // SUPER ADMIN — dashboards & insights
+  // ===================================================================
+
+  // -------------------------------------------------------------------
+  // GET /billing/admin/overview — KPIs do negócio (MRR, ARR, churn)
+  // -------------------------------------------------------------------
+  app.get("/admin/overview", { preHandler: requireSuperAdmin }, async () => {
+    const r = await db.query(
+      `WITH active_subs AS (
+         SELECT s.*, p.price_cents, p.billing_cycle, p.tier
+           FROM tenant_subscriptions s
+           JOIN subscription_plans p ON p.id = s.plan_id
+          WHERE s.status = 'active'
+       ),
+       mrr_calc AS (
+         SELECT
+           COALESCE(SUM(CASE WHEN billing_cycle = 'monthly' THEN price_cents
+                             WHEN billing_cycle = 'annual'  THEN price_cents / 12
+                             ELSE 0 END), 0)::bigint AS mrr_cents
+           FROM active_subs
+       )
+       SELECT
+         (SELECT COUNT(*)::int FROM active_subs)                              AS active_count,
+         (SELECT COUNT(*)::int FROM tenant_subscriptions
+           WHERE status = 'past_due')                                         AS past_due_count,
+         (SELECT COUNT(*)::int FROM tenant_subscriptions
+           WHERE status = 'canceled')                                         AS canceled_count,
+         (SELECT mrr_cents FROM mrr_calc)                                     AS mrr_cents,
+         (SELECT mrr_cents * 12 FROM mrr_calc)                                AS arr_cents,
+         (SELECT COUNT(*)::int FROM subscription_events
+           WHERE event_type IN ('canceled') AND created_at > NOW() - INTERVAL '30 days') AS churn_30d_count,
+         (SELECT COUNT(*)::int FROM subscription_events
+           WHERE event_type IN ('payment_succeeded') AND created_at > NOW() - INTERVAL '30 days') AS payments_30d_count,
+         (SELECT COALESCE(SUM(amount_cents), 0)::bigint FROM subscription_events
+           WHERE event_type IN ('payment_succeeded') AND created_at > NOW() - INTERVAL '30 days') AS revenue_30d_cents,
+         (SELECT COUNT(*)::int FROM subscription_events
+           WHERE event_type IN ('payment_failed') AND created_at > NOW() - INTERVAL '30 days') AS failed_30d_count,
+         (SELECT COUNT(*)::int FROM tenants WHERE status = 'pending_payment') AS pending_payment_count`,
+    );
+    return r.rows[0];
+  });
+
+  // -------------------------------------------------------------------
+  // GET /billing/admin/subscriptions — lista todos os assinantes
+  // ?status=&tier=&search=
+  // -------------------------------------------------------------------
+  app.get("/admin/subscriptions", { preHandler: requireSuperAdmin }, async (req) => {
+    const q = req.query as any;
+    const conds: string[] = ["1=1"];
+    const params: any[] = [];
+    let i = 1;
+    if (q.status) { conds.push(`s.status = $${i++}`); params.push(q.status); }
+    if (q.tier)   { conds.push(`p.tier = $${i++}`);   params.push(q.tier); }
+    if (q.search) {
+      conds.push(`(t.name ILIKE $${i} OR t.slug ILIKE $${i} OR t.email ILIKE $${i})`);
+      params.push(`%${q.search}%`); i++;
+    }
+    const where = conds.join(" AND ");
+
+    const r = await db.query(
+      `SELECT
+         t.id AS tenant_id, t.slug, t.name, t.email,
+         p.name AS plan_name, p.tier, p.billing_cycle, p.price_cents,
+         s.status, s.current_period_end, s.cancel_at_period_end,
+         s.ai_messages_used, p.included_ai_messages,
+         s.created_at AS subscribed_at
+       FROM tenant_subscriptions s
+       JOIN tenants t ON t.id = s.tenant_id
+       JOIN subscription_plans p ON p.id = s.plan_id
+      WHERE ${where}
+      ORDER BY s.created_at DESC
+      LIMIT 200`,
+      params,
+    );
+    return { items: r.rows };
+  });
+
+  // -------------------------------------------------------------------
+  // GET /billing/admin/events — eventos recentes (audit trail)
+  // -------------------------------------------------------------------
+  app.get("/admin/events", { preHandler: requireSuperAdmin }, async (req) => {
+    const limit = Math.min(Number((req.query as any).limit ?? 50), 200);
+    const r = await db.query(
+      `SELECT e.*, t.name AS tenant_name, t.slug AS tenant_slug,
+              p_from.name AS from_plan_name,
+              p_to.name AS to_plan_name
+         FROM subscription_events e
+         JOIN tenants t ON t.id = e.tenant_id
+         LEFT JOIN subscription_plans p_from ON p_from.id = e.from_plan_id
+         LEFT JOIN subscription_plans p_to   ON p_to.id   = e.to_plan_id
+        ORDER BY e.created_at DESC
+        LIMIT $1`,
+      [limit],
+    );
+    return { items: r.rows };
+  });
+
+  // ===================================================================
   // SUPER ADMIN — gestão do catálogo de planos
   // ===================================================================
 

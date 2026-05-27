@@ -1,10 +1,24 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
 import { Toaster } from "react-hot-toast";
+import type { ResolvedTenantBranding } from "@/lib/resolve-tenant";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+// Contexto que carrega o branding do tenant (vindo do SSR)
+const TenantBrandingContext = createContext<ResolvedTenantBranding | null>(null);
+
+export function useTenantBranding() {
+  return useContext(TenantBrandingContext);
+}
+
+export function Providers({
+  children,
+  initialTenantBranding,
+}: {
+  children: React.ReactNode;
+  initialTenantBranding?: ResolvedTenantBranding | null;
+}) {
   const [qc] = useState(
     () =>
       new QueryClient({
@@ -14,18 +28,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
   return (
-    <QueryClientProvider client={qc}>
-      {children}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "#0F1A52",
-            color: "#F4F6FF",
-            border: "1px solid #1A2358",
-          },
-        }}
-      />
-    </QueryClientProvider>
+    <TenantBrandingContext.Provider value={initialTenantBranding ?? null}>
+      <QueryClientProvider client={qc}>
+        {children}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: "#0F1A52",
+              color: "#F4F6FF",
+              border: "1px solid #1A2358",
+            },
+          }}
+        />
+      </QueryClientProvider>
+    </TenantBrandingContext.Provider>
   );
 }
