@@ -100,8 +100,9 @@ export async function instancesRoutes(app: FastifyInstance) {
       const headers = { Authorization: `Bearer ${inst.session_token}` };
 
       // 1. Dispara start-session (assíncrono — WPP retorna rápido, ainda CLOSED)
+      //    NÃO passamos webhook aqui — WPP usa o WEBHOOK_URL global do .env
+      //    (passar `webhook: null` aqui sobrescreve e DESATIVA o webhook!)
       await callWpp(inst.session_name, inst.session_token, "/start-session", {
-        webhook: null,
         waitQrCode: false,
       });
 
@@ -217,6 +218,31 @@ export async function instancesRoutes(app: FastifyInstance) {
         [id, isConnected ? "connected" : "connecting", isConnected, qrcode],
       );
       return { status, qrcode };
+    } catch (err: any) {
+      return reply.code(502).send({ error: err.message });
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Refresh webhook — registra o webhook na sessão já ativa.
+  // Usado quando a sessão foi iniciada antes do webhook estar configurado.
+  // -----------------------------------------------------------------
+  app.post("/:id/refresh-webhook", { preHandler: requireTenant }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const r = await db.query(
+      `SELECT session_name, session_token FROM whatsapp_instances WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId!],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "não encontrado" });
+    const inst = r.rows[0];
+
+    // O WPP-Connect aceita re-config via close-session + start-session (mantém sessão WA)
+    try {
+      // Não fecha — usa endpoint dedicado pra atualizar webhook
+      await callWpp(inst.session_name, inst.session_token, "/start-session", {
+        waitQrCode: false,
+      });
+      return { ok: true, msg: "webhook re-registrado via start-session" };
     } catch (err: any) {
       return reply.code(502).send({ error: err.message });
     }
