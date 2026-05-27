@@ -18,6 +18,10 @@ import { templatesRoutes } from "./modules/campaigns/templates.routes";
 import { campaignsRoutes } from "./modules/campaigns/campaigns.routes";
 import { creditsRoutes } from "./modules/credits/credits.routes";
 import { paymentRoutes } from "./modules/credits/payment.routes";
+import { pipelinesRoutes } from "./modules/funnel/pipelines.routes";
+import { teamsRoutes } from "./modules/funnel/teams.routes";
+import { cardsRoutes } from "./modules/funnel/cards.routes";
+import { funnelMetricsRoutes } from "./modules/funnel/metrics.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
@@ -104,6 +108,12 @@ async function bootstrap() {
   app.register(campaignsRoutes,     { prefix: "/campaigns" });
   app.register(creditsRoutes,       { prefix: "/credits" });
   app.register(paymentRoutes,       { prefix: "/credits" });   // /credits/checkout, /credits/stripe-webhook
+
+  // Módulo Funil de Atendimento (CRM)
+  app.register(pipelinesRoutes,     { prefix: "/pipelines" });
+  app.register(teamsRoutes,         { prefix: "/teams" });
+  app.register(cardsRoutes,         { prefix: "/cards" });
+  app.register(funnelMetricsRoutes, { prefix: "/funnel-metrics" });
 
   app.setErrorHandler((err, _req, reply) => {
     app.log.error(err);

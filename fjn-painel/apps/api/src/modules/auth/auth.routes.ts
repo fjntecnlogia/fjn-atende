@@ -101,10 +101,12 @@ export async function authRoutes(app: FastifyInstance) {
     try {
       await client.query("BEGIN");
 
-      // 1) cria tenant em plano TRIAL (14 dias)
+      // 1) cria tenant em modo PENDING_PAYMENT (precisa pagar plano pra ativar)
+      // Sem trial: cliente cria conta, escolhe plano, paga → ativa.
+      // FJN super-admin gerencia tenants existentes sem precisar pagar.
       const tRes = await client.query(
-        `INSERT INTO tenants (slug, name, email, phone, plan, status, trial_ends_at, ai_persona, branding)
-         VALUES ($1, $2, $3, $4, 'trial', 'active', NOW() + INTERVAL '14 days',
+        `INSERT INTO tenants (slug, name, email, phone, plan, status, ai_persona, branding)
+         VALUES ($1, $2, $3, $4, 'none', 'pending_payment',
                  '{"name":"Atendente","tone":"caloroso e direto"}'::jsonb,
                  '{"primary_color":"#0B1340","accent_color":"#FFBA00"}'::jsonb)
          RETURNING *`,
