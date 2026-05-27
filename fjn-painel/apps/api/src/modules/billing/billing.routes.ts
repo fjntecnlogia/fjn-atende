@@ -13,8 +13,25 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { db } from "../../db/client";
 import { config } from "../../config";
-import { requireAuth, requireTenant } from "../../lib/auth";
+import { requireAuth, requireTenant, requireSuperAdmin } from "../../lib/auth";
 import { getStripe, isStripeEnabled } from "../../lib/stripe";
+
+const planMutationSchema = z.object({
+  slug: z.string().min(3).max(40).regex(/^[a-z0-9_]+$/).optional(),
+  name: z.string().min(2).max(60).optional(),
+  tier: z.enum(["pro", "pro_plus", "enterprise"]).optional(),
+  billing_cycle: z.enum(["monthly", "annual"]).optional(),
+  price_cents: z.number().int().min(0).optional(),
+  max_instances: z.number().int().min(1).optional(),
+  max_users: z.number().int().min(1).optional(),
+  max_pipelines: z.number().int().min(1).optional(),
+  max_teams: z.number().int().min(0).optional(),
+  included_ai_messages: z.number().int().min(0).optional(),
+  included_campaign_msgs: z.number().int().min(0).optional(),
+  features: z.record(z.boolean()).optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
 
 export async function billingRoutes(app: FastifyInstance) {
   // -------------------------------------------------------------------
@@ -253,6 +270,118 @@ export async function billingRoutes(app: FastifyInstance) {
     } catch (err: any) {
       return reply.code(500).send({ error: err.message });
     }
+  });
+
+  // ===================================================================
+  // SUPER ADMIN — gestão do catálogo de planos
+  // ===================================================================
+
+  // -------------------------------------------------------------------
+  // GET /billing/admin/plans — todos (inclusive inativos)
+  // -------------------------------------------------------------------
+  app.get("/admin/plans", { preHandler: requireSuperAdmin }, async () => {
+    const r = await db.query(
+      `SELECT id, slug, name, tier, billing_cycle, price_cents, stripe_price_id,
+              max_instances, max_users, max_pipelines, max_teams,
+              included_ai_messages, included_campaign_msgs, features,
+              is_active, sort_order, created_at,
+              (SELECT COUNT(*)::int FROM tenant_subscriptions s WHERE s.plan_id = subscription_plans.id) AS subscribers_count
+         FROM subscription_plans
+        ORDER BY sort_order ASC, id ASC`,
+    );
+    return { items: r.rows };
+  });
+
+  // -------------------------------------------------------------------
+  // POST /billing/admin/plans — cria plano novo
+  // -------------------------------------------------------------------
+  app.post("/admin/plans", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const data = planMutationSchema.parse(req.body);
+    const required = ["slug", "name", "tier", "billing_cycle", "price_cents"];
+    for (const f of required) {
+      if ((data as any)[f] === undefined) {
+        return reply.code(400).send({ error: `campo obrigatório: ${f}` });
+      }
+    }
+    const r = await db.query(
+      `INSERT INTO subscription_plans
+        (slug, name, tier, billing_cycle, price_cents,
+         max_instances, max_users, max_pipelines, max_teams,
+         included_ai_messages, included_campaign_msgs, features, is_active, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       RETURNING *`,
+      [
+        data.slug, data.name, data.tier, data.billing_cycle, data.price_cents,
+        data.max_instances ?? 1, data.max_users ?? 3,
+        data.max_pipelines ?? 1, data.max_teams ?? 0,
+        data.included_ai_messages ?? 1000, data.included_campaign_msgs ?? 1000,
+        JSON.stringify(data.features ?? {}),
+        data.is_active ?? true,
+        data.sort_order ?? 99,
+      ],
+    );
+    return reply.code(201).send(r.rows[0]);
+  });
+
+  // -------------------------------------------------------------------
+  // PUT /billing/admin/plans/:id — atualiza
+  // Se price_cents mudou: limpa stripe_price_id (vai ser recriado)
+  // -------------------------------------------------------------------
+  app.put("/admin/plans/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const data = planMutationSchema.parse(req.body);
+
+    const oldRes = await db.query(`SELECT price_cents FROM subscription_plans WHERE id = $1`, [id]);
+    if (oldRes.rowCount === 0) return reply.code(404).send({ error: "plano não encontrado" });
+    const oldPrice = oldRes.rows[0].price_cents;
+
+    const fields: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+    for (const [k, v] of Object.entries(data)) {
+      fields.push(`${k} = $${i++}`);
+      values.push(k === "features" ? JSON.stringify(v) : v);
+    }
+
+    // Se mudou o preço, força criação de novo Stripe Price na próxima
+    if (data.price_cents !== undefined && data.price_cents !== oldPrice) {
+      fields.push(`stripe_price_id = NULL`);
+    }
+
+    if (fields.length === 0) return reply.code(400).send({ error: "nada pra atualizar" });
+    values.push(id);
+
+    const r = await db.query(
+      `UPDATE subscription_plans SET ${fields.join(", ")}
+        WHERE id = $${i}
+        RETURNING *`,
+      values,
+    );
+    return r.rows[0];
+  });
+
+  // -------------------------------------------------------------------
+  // DELETE /billing/admin/plans/:id — desativa
+  // -------------------------------------------------------------------
+  app.delete("/admin/plans/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+
+    const subs = await db.query(
+      `SELECT COUNT(*)::int AS c FROM tenant_subscriptions WHERE plan_id = $1 AND status = 'active'`,
+      [id],
+    );
+    if (subs.rows[0].c > 0) {
+      return reply.code(400).send({
+        error: `${subs.rows[0].c} cliente(s) ativo(s) neste plano — não pode apagar. Apenas desative (is_active=false).`,
+      });
+    }
+
+    const r = await db.query(
+      `UPDATE subscription_plans SET is_active = FALSE WHERE id = $1 RETURNING id`,
+      [id],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "plano não encontrado" });
+    return { ok: true };
   });
 
   // -------------------------------------------------------------------

@@ -27,6 +27,7 @@ const tenantNav = [
 const superAdminNav = [
   { href: "/admin",          label: "Visão Geral", icon: Crown },
   { href: "/admin/tenants",  label: "Tenants",     icon: Building2 },
+  { href: "/admin/planos",   label: "Planos",      icon: CreditCard },
 ];
 
 export function Sidebar({ realtimeConnected = false }: { realtimeConnected?: boolean }) {
