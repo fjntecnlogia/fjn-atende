@@ -607,7 +607,11 @@ function Footer() {
       </div>
       <div className="max-w-6xl mx-auto px-6 mt-8 pt-6 border-t border-border flex flex-col md:flex-row justify-between gap-3 text-xs text-gray2">
         <p>© {new Date().getFullYear()} FJN Tecnologia. Todos os direitos reservados.</p>
-        <p>Made with 🧡 em Cuiabá-MT</p>
+        <div className="flex flex-wrap gap-4 items-center">
+          <Link href="/termos" className="hover:text-orange">Termos de Uso</Link>
+          <Link href="/privacidade" className="hover:text-orange">Privacidade</Link>
+          <span>Made with 🧡 em Cuiabá-MT</span>
+        </div>
       </div>
     </footer>
   );

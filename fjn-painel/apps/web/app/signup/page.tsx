@@ -21,6 +21,9 @@ const schema = z.object({
   owner_email: z.string().email("E-mail inválido"),
   owner_password: z.string().min(8, "Mínimo 8 caracteres"),
   owner_phone: z.string().optional(),
+  accept_terms: z.literal(true, {
+    errorMap: () => ({ message: "Você precisa aceitar os Termos e a Política de Privacidade" }),
+  }),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -49,7 +52,9 @@ export default function SignupPage() {
   async function onSubmit(data: FormData) {
     setLoading(true);
     try {
-      const r = await api.post("/auth/signup", data);
+      // Remove accept_terms do payload — só validação no frontend
+      const { accept_terms, ...payload } = data;
+      const r = await api.post("/auth/signup", payload);
       setSession(r.data.token, r.data.user, r.data.tenant);
       toast.success("Conta criada! Bem-vindo ao FJN Atende 🎉", { duration: 5000 });
       router.replace("/dashboard");
@@ -160,6 +165,20 @@ export default function SignupPage() {
               <input className="input w-full" placeholder="(11) 99999-8888"
                      {...register("owner_phone")} />
             </div>
+
+            <label className="flex items-start gap-2 mt-2 text-xs text-light/80 cursor-pointer">
+              <input type="checkbox" {...register("accept_terms")} className="mt-0.5 accent-orange shrink-0" />
+              <span>
+                Eu li e aceito os{" "}
+                <Link href="/termos" target="_blank" className="text-orange hover:underline">Termos de Uso</Link>{" "}
+                e a{" "}
+                <Link href="/privacidade" target="_blank" className="text-orange hover:underline">Política de Privacidade</Link>.
+                Concordo com o tratamento de dados conforme LGPD.
+              </span>
+            </label>
+            {errors.accept_terms && (
+              <p className="text-orange text-xs">{errors.accept_terms.message}</p>
+            )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full mt-4">
               {loading ? "Criando conta..." : "Criar conta grátis"}
