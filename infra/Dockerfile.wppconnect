@@ -34,14 +34,17 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV CHROME_BIN=/usr/bin/chromium-browser
 
+# Garante que devDependencies (incluindo TypeScript) sejam instaladas
+ENV NODE_ENV=development
+
 # Clona a versão mais recente do repo oficial
 RUN git clone --depth 1 https://github.com/wppconnect-team/wppconnect-server.git .
 
-# Instala deps + sharp (com fallback)
-RUN npm install --legacy-peer-deps --omit=optional && \
+# Instala TUDO (incluindo devDeps pra ter o tsc)
+RUN npm install --legacy-peer-deps && \
     npm install sharp --ignore-scripts --legacy-peer-deps || true
 
-# Build TS
+# Build TS (tsc + JS)
 RUN npm run build
 
 # =====================================================================
