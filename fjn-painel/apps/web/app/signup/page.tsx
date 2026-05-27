@@ -56,8 +56,8 @@ export default function SignupPage() {
       const { accept_terms, ...payload } = data;
       const r = await api.post("/auth/signup", payload);
       setSession(r.data.token, r.data.user, r.data.tenant);
-      toast.success("Conta criada! Bem-vindo ao FJN Atende 🎉", { duration: 5000 });
-      router.replace("/dashboard");
+      toast.success("Conta criada! Agora escolha seu plano 🚀", { duration: 5000 });
+      router.replace("/planos");
     } catch (err: any) {
       toast.error(err?.response?.data?.error ?? "Falha ao criar conta");
     } finally {
