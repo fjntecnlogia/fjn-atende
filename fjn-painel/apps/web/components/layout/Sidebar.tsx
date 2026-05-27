@@ -72,7 +72,7 @@ export function Sidebar({ realtimeConnected = false }: { realtimeConnected?: boo
       <nav className="flex-1 py-4 flex flex-col gap-0.5">
         {/* Itens de tenant (visíveis quando tenant ativo OU role normal) */}
         {(activeTenantId || !isSuperAdmin) && tenantNav.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+          const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link key={href} href={href}
               className={cn("flex items-center gap-3 px-6 py-2.5 text-sm transition-all border-r-2",

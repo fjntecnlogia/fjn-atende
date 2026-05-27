@@ -31,15 +31,33 @@ export default function PlanosPage() {
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null);
 
-  const { data: plansData } = useQuery<{ items: Plan[] }>({
+  const { data: plansData, error: plansError } = useQuery<{ items: Plan[] }>({
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
+    retry: false,
   });
 
   const { data: subData } = useQuery<any>({
     queryKey: ["subscription"],
     queryFn: async () => (await api.get("/billing/subscription")).data,
+    retry: false,
   });
+
+  // Fallback se backend ainda não tem a migration 11 aplicada
+  if (plansError) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto text-center space-y-4">
+        <Crown size={48} className="text-orange mx-auto" />
+        <h1 className="font-display text-2xl font-extrabold text-light">
+          Catálogo de planos indisponível
+        </h1>
+        <p className="text-gray2 text-sm">
+          Aplique a migration <code className="bg-navy3 px-2 py-0.5 rounded">11_subscriptions.sql</code> no
+          banco e reinicie o servidor.
+        </p>
+      </div>
+    );
+  }
 
   const plans = (plansData?.items ?? []).filter((p) => p.billing_cycle === cycle);
   const currentPlanId = subData?.has_subscription ? subData?.plan_slug : null;

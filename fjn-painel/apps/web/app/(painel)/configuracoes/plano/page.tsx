@@ -21,10 +21,11 @@ function fmtDate(iso: string) {
 
 export default function ConfiguracoesPlanoPage() {
   const qc = useQueryClient();
-  const { data: sub } = useQuery<any>({
+  const { data: sub, isLoading, error } = useQuery<any>({
     queryKey: ["subscription"],
     queryFn: async () => (await api.get("/billing/subscription")).data,
     refetchInterval: 30_000,
+    retry: false,
   });
 
   const cancelMut = useMutation({
@@ -53,7 +54,27 @@ export default function ConfiguracoesPlanoPage() {
     onError: (e: any) => toast.error(e?.response?.data?.error ?? "Erro"),
   });
 
-  if (!sub) return <div className="p-8 text-gray2">Carregando...</div>;
+  if (isLoading) return <div className="p-8 text-gray2">Carregando...</div>;
+
+  // Erro de backend (provavelmente migration 11 ainda não aplicada)
+  if (error || !sub) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto text-center space-y-4">
+        <AlertTriangle size={48} className="text-orange mx-auto" />
+        <h1 className="font-display text-2xl font-extrabold text-light">
+          Sistema de planos indisponível
+        </h1>
+        <p className="text-gray2 text-sm">
+          O backend do billing ainda não está pronto neste ambiente.
+          Aplique a migration <code className="bg-navy3 px-2 py-0.5 rounded">11_subscriptions.sql</code> no banco
+          e reinicie o servidor.
+        </p>
+        <p className="text-xs text-gray2/70">
+          Detalhes: {(error as any)?.message ?? "endpoint /billing/subscription falhou"}
+        </p>
+      </div>
+    );
+  }
 
   if (!sub.has_subscription) {
     return (
