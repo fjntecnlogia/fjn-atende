@@ -1,0 +1,77 @@
+# =====================================================================
+# Build local do WPP-Connect Server (versão mais recente do source)
+#
+# Baseado no Dockerfile oficial do projeto:
+# https://github.com/wppconnect-team/wppconnect-server/blob/main/Dockerfile.dev
+#
+# Por que? As imagens publicadas no Docker Hub estão com a lib
+# @wppconnect-team/wppconnect desatualizada (v1.x), que não detecta
+# mais o QR no WhatsApp Web atual. Build local garante v2.x atualizada.
+# =====================================================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Dependências de build (sharp, vips, chromium etc.)
+RUN apk add --no-cache \
+    git \
+    chromium \
+    vips-dev \
+    fftw-dev \
+    gcc \
+    g++ \
+    make \
+    python3 \
+    libc6-compat \
+    udev \
+    ttf-freefont \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV CHROME_BIN=/usr/bin/chromium-browser
+
+# Clona a versão mais recente do repo oficial
+RUN git clone --depth 1 https://github.com/wppconnect-team/wppconnect-server.git .
+
+# Instala deps + sharp (com fallback)
+RUN npm install --legacy-peer-deps --omit=optional && \
+    npm install sharp --ignore-scripts --legacy-peer-deps || true
+
+# Build TS
+RUN npm run build
+
+# =====================================================================
+FROM node:20-alpine AS runner
+
+WORKDIR /usr/src/wpp-server
+
+# Runtime deps (chromium + libs)
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    vips \
+    fftw \
+    libc6-compat \
+    udev
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+
+EXPOSE 21465
+
+CMD ["node", "dist/server.js"]

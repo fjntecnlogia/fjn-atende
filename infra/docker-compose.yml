@@ -64,9 +64,12 @@ services:
   # Repo: https://github.com/wppconnect-team/wppconnect-server
   # -------------------------------------------------------------------
   wppconnect:
-    # NOTA: tentamos antes wppconnect/server-cli (era CLI, não gerava QR).
-    # Esta é a imagem do server completo, mantida ativamente.
-    image: unilogica/wppconnect-server:2.8.6-7
+    # Build local da versão mais recente (imagens publicadas no Docker Hub
+    # estão com lib v1.x desatualizada que não gera QR no WA Web atual).
+    build:
+      context: .
+      dockerfile: Dockerfile.wppconnect
+    image: fjn/wppconnect-server:latest   # tag local após o build
     container_name: fjn_wppconnect
     restart: unless-stopped
     ports:
