@@ -351,6 +351,137 @@ export async function billingRoutes(app: FastifyInstance) {
   });
 
   // -------------------------------------------------------------------
+  // GET /billing/admin/tenant/:id — visão completa de billing dum tenant
+  // -------------------------------------------------------------------
+  app.get("/admin/tenant/:id", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const tenantId = Number((req.params as any).id);
+
+    const subRes = await db.query(
+      `SELECT * FROM tenant_subscription_summary WHERE tenant_id = $1`,
+      [tenantId],
+    );
+
+    const eventsRes = await db.query(
+      `SELECT e.*, p_from.name AS from_plan_name, p_to.name AS to_plan_name
+         FROM subscription_events e
+         LEFT JOIN subscription_plans p_from ON p_from.id = e.from_plan_id
+         LEFT JOIN subscription_plans p_to   ON p_to.id   = e.to_plan_id
+        WHERE e.tenant_id = $1
+        ORDER BY e.created_at DESC
+        LIMIT 50`,
+      [tenantId],
+    );
+
+    const creditsRes = await db.query(
+      `SELECT balance_cents, total_purchased_cents, total_spent_cents
+         FROM tenant_credits WHERE tenant_id = $1`,
+      [tenantId],
+    );
+
+    // Resumo de gastos dos últimos 6 meses (do credit_transactions, se existir)
+    const usageRes = await db.query(
+      `SELECT
+         TO_CHAR(date_trunc('month', created_at), 'YYYY-MM') AS month,
+         COUNT(*) FILTER (WHERE kind = 'ai_overage')::int   AS ai_overage_count,
+         COALESCE(SUM(amount_cents) FILTER (WHERE amount_cents > 0), 0)::bigint AS credits_added,
+         COALESCE(-SUM(amount_cents) FILTER (WHERE amount_cents < 0), 0)::bigint AS credits_spent
+       FROM credit_transactions
+      WHERE tenant_id = $1
+        AND created_at >= date_trunc('month', NOW() - INTERVAL '5 months')
+      GROUP BY 1
+      ORDER BY 1 DESC`,
+      [tenantId],
+    ).catch(() => ({ rows: [] }));
+
+    return {
+      subscription: subRes.rows[0] ?? null,
+      events: eventsRes.rows,
+      credits: creditsRes.rows[0] ?? null,
+      monthly_usage: usageRes.rows,
+    };
+  });
+
+  // -------------------------------------------------------------------
+  // POST /billing/admin/tenant/:id/extend — concede N dias grátis
+  // -------------------------------------------------------------------
+  app.post("/admin/tenant/:id/extend", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const tenantId = Number((req.params as any).id);
+    const { days, reason } = z.object({
+      days: z.number().int().min(1).max(365),
+      reason: z.string().max(500).optional(),
+    }).parse(req.body);
+
+    const r = await db.query(
+      `UPDATE tenant_subscriptions
+          SET current_period_end = COALESCE(current_period_end, NOW()) + ($1 || ' days')::interval,
+              status = 'active', updated_at = NOW()
+        WHERE tenant_id = $2
+        RETURNING current_period_end`,
+      [days, tenantId],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "tenant sem subscription" });
+
+    await db.query(`UPDATE tenants SET status = 'active' WHERE id = $1`, [tenantId]);
+
+    await db.query(
+      `INSERT INTO subscription_events (tenant_id, event_type, metadata)
+       VALUES ($1, 'admin_extended', $2)`,
+      [tenantId, JSON.stringify({ days, reason: reason ?? null })],
+    );
+
+    return { ok: true, new_period_end: r.rows[0].current_period_end };
+  });
+
+  // -------------------------------------------------------------------
+  // POST /billing/admin/tenant/:id/force-active — desbloqueio emergencial
+  // -------------------------------------------------------------------
+  app.post("/admin/tenant/:id/force-active", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const tenantId = Number((req.params as any).id);
+    const { reason } = z.object({
+      reason: z.string().max(500).optional(),
+    }).parse(req.body);
+
+    await db.query(`UPDATE tenants SET status = 'active' WHERE id = $1`, [tenantId]);
+
+    await db.query(
+      `UPDATE tenant_subscriptions SET status = 'active', updated_at = NOW()
+        WHERE tenant_id = $1`,
+      [tenantId],
+    );
+
+    await db.query(
+      `INSERT INTO subscription_events (tenant_id, event_type, metadata)
+       VALUES ($1, 'admin_forced_active', $2)`,
+      [tenantId, JSON.stringify({ reason: reason ?? null })],
+    );
+
+    return { ok: true };
+  });
+
+  // -------------------------------------------------------------------
+  // POST /billing/admin/tenant/:id/portal — gera URL do Customer Portal
+  // (super-admin abre o portal Stripe do cliente pra ajudar)
+  // -------------------------------------------------------------------
+  app.post("/admin/tenant/:id/portal", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const tenantId = Number((req.params as any).id);
+    const r = await db.query(
+      `SELECT stripe_customer_id FROM tenant_subscriptions WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    if (r.rowCount === 0 || !r.rows[0].stripe_customer_id) {
+      return reply.code(404).send({ error: "tenant sem stripe_customer_id" });
+    }
+    if (!isStripeEnabled()) return reply.code(503).send({ error: "stripe não configurado" });
+
+    const stripe = getStripe();
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: r.rows[0].stripe_customer_id,
+      return_url: `${config.WEB_URL}/admin/tenants/${tenantId}`,
+    });
+    return { url: portal.url };
+  });
+
+  // -------------------------------------------------------------------
   // GET /billing/admin/events — eventos recentes (audit trail)
   // -------------------------------------------------------------------
   app.get("/admin/events", { preHandler: requireSuperAdmin }, async (req) => {
