@@ -21,16 +21,22 @@ export type ArticleCategory =
   | "funil"
   | "campanhas"
   | "planos"
-  | "whitelabel";
+  | "whitelabel"
+  | "avancado"
+  | "troubleshooting"
+  | "cases";
 
 export const CATEGORIES: Record<ArticleCategory, { label: string; emoji: string; description: string }> = {
-  comecar:    { label: "Começar",          emoji: "🚀", description: "Primeiros passos no FJN Atende" },
-  whatsapp:   { label: "WhatsApp",         emoji: "📱", description: "Conectar e gerenciar instâncias" },
-  ia:         { label: "IA",               emoji: "🤖", description: "Configurar e personalizar a IA" },
-  funil:      { label: "Funil",            emoji: "📊", description: "Kanban, times e métricas" },
-  campanhas:  { label: "Campanhas",        emoji: "📣", description: "Disparo em massa anti-ban" },
-  planos:     { label: "Planos & Créditos", emoji: "💳", description: "Assinatura, créditos e cotas" },
-  whitelabel: { label: "White-label",      emoji: "🎨", description: "Personalizar marca (Pro+)" },
+  comecar:         { label: "Começar",          emoji: "🚀", description: "Primeiros passos no FJN Atende" },
+  whatsapp:        { label: "WhatsApp",         emoji: "📱", description: "Conectar e gerenciar instâncias" },
+  ia:              { label: "IA",               emoji: "🤖", description: "Configurar e personalizar a IA" },
+  funil:           { label: "Funil",            emoji: "📊", description: "Kanban, times e métricas" },
+  campanhas:       { label: "Campanhas",        emoji: "📣", description: "Disparo em massa anti-ban" },
+  planos:          { label: "Planos & Créditos", emoji: "💳", description: "Assinatura, créditos e cotas" },
+  whitelabel:      { label: "White-label",      emoji: "🎨", description: "Personalizar marca (Pro+)" },
+  avancado:        { label: "Avançado",         emoji: "⚡", description: "Testes A/B, automações, integrações" },
+  troubleshooting: { label: "Problemas comuns", emoji: "🔧", description: "Resolver erros e travamentos" },
+  cases:           { label: "Cases de uso",     emoji: "💡", description: "Como outros negócios usam o FJN" },
 };
 
 export const ARTICLES: Article[] = [
@@ -513,6 +519,483 @@ export const ARTICLES: Article[] = [
         e <strong>esconder marca FJN</strong> dos e-mails.</p>
     `,
     related: ["diferenca-pro-pro-plus"],
+  },
+
+  // =====================================================================
+  // AVANÇADO
+  // =====================================================================
+  {
+    slug: "teste-ab-campanhas",
+    title: "Teste A/B em campanhas — qual mensagem converte mais?",
+    category: "avancado",
+    description: "Compare 2 versões da mesma mensagem com metade da lista",
+    body: `
+      <h2>Por que testar</h2>
+      <p>Pequenas mudanças no texto podem dobrar a taxa de resposta. Em vez de adivinhar,
+        teste com dados reais.</p>
+
+      <h2>Como fazer (passo a passo)</h2>
+      <ol>
+        <li><strong>Cria 2 templates</strong> em <a href="/campanhas/templates">/campanhas/templates</a>:
+          <ul>
+            <li>"Template_A": versão original</li>
+            <li>"Template_B": versão alternativa (muda só 1 elemento — assunto, CTA, ou tom)</li>
+          </ul>
+        </li>
+        <li><strong>Divide sua lista em 2</strong>:
+          <ul>
+            <li>Exporta lista CSV em <a href="/campanhas/listas">/campanhas/listas</a></li>
+            <li>No Excel: divide em 2 arquivos balanceados (50/50)</li>
+            <li>Importa como "Lista_A" e "Lista_B"</li>
+          </ul>
+        </li>
+        <li><strong>Cria 2 campanhas</strong>, cada uma com sua lista + template</li>
+        <li><strong>Dispara no mesmo horário</strong> pra comparar com mesmas condições</li>
+        <li><strong>Após 24h</strong>, compara as métricas em <a href="/campanhas">/campanhas</a>:
+          <ul>
+            <li>Taxa de entrega (% que chegou)</li>
+            <li>Taxa de resposta (% que respondeu)</li>
+            <li>Conversões em vendas (cards Ganho no funil)</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h2>O que testar primeiro</h2>
+      <ul>
+        <li><strong>Saudação</strong>: "Olá!" vs "Oi tudo bem?" vs nome</li>
+        <li><strong>CTA</strong>: "Saiba mais" vs "Aproveite" vs pergunta direta</li>
+        <li><strong>Urgência</strong>: com vs sem prazo</li>
+        <li><strong>Tom</strong>: formal vs descontraído</li>
+        <li><strong>Emoji</strong>: zero, pouco, muito</li>
+      </ul>
+
+      <h2>Regra de ouro</h2>
+      <p><strong>Mude UMA coisa por vez</strong>. Se mudar texto inteiro, você não sabe o que fez diferença.</p>
+    `,
+    related: ["fazer-campanha", "importar-csv"],
+  },
+  {
+    slug: "automacoes-tags",
+    title: "Automações com tags e segmentação",
+    category: "avancado",
+    description: "Marque contatos com tags pra atendimento personalizado",
+    body: `
+      <h2>O que são tags</h2>
+      <p>Tags são rótulos que você atribui a contatos ou cards de funil pra identificá-los
+        rapidamente. Ex: "vip", "regional-sp", "produto-x", "lead-frio".</p>
+
+      <h2>Onde usar</h2>
+      <ul>
+        <li><strong>No card do funil</strong>: arrasta tags na sidebar pra organizar por categoria</li>
+        <li><strong>Em campanhas</strong>: filtra contatos pra disparar só pros "vip"</li>
+        <li><strong>Em métricas</strong>: agrupa conversões por tag</li>
+      </ul>
+
+      <h2>Casos práticos</h2>
+
+      <h3>Segmentação por estágio</h3>
+      <ul>
+        <li>"lead-frio" — recém entrou, ainda não respondeu</li>
+        <li>"interessado" — pediu mais info</li>
+        <li>"quente" — pediu proposta</li>
+        <li>"cliente" — já comprou</li>
+      </ul>
+
+      <h3>Segmentação por produto</h3>
+      <ul>
+        <li>"plano-basico", "plano-premium" pra dar atendimento diferenciado</li>
+      </ul>
+
+      <h3>Segmentação geográfica</h3>
+      <ul>
+        <li>"sul", "sudeste" pra disparos regionais</li>
+      </ul>
+
+      <h2>Dica</h2>
+      <p>Cria uma lista pequena de 5-10 tags principais e <strong>seja consistente</strong>.
+        Se cada atendente cria tags próprias, vira bagunça.</p>
+    `,
+    related: ["o-que-e-funil", "fazer-campanha"],
+  },
+  {
+    slug: "integracao-api",
+    title: "Integração via API (Pro+)",
+    category: "avancado",
+    description: "Conecte o FJN Atende com seu sistema próprio",
+    body: `
+      <h2>Pra quem é</h2>
+      <p>Empresas que querem:</p>
+      <ul>
+        <li>Sincronizar leads com CRM próprio (RD Station, HubSpot, etc)</li>
+        <li>Receber notificação automática quando lead novo entra</li>
+        <li>Enviar mensagens via integração com sistema legado</li>
+        <li>Construir dashboards customizados com dados do FJN</li>
+      </ul>
+
+      <h2>Como funciona</h2>
+      <ol>
+        <li>Você gera uma <strong>API Key</strong> em <em>Config IA → Integrações → Criar API Key</em></li>
+        <li>Usa essa key no header <code>Authorization: Bearer YOUR_KEY</code></li>
+        <li>Chama endpoints REST conforme a documentação técnica</li>
+      </ol>
+
+      <h2>Endpoints principais</h2>
+      <ul>
+        <li><code>GET /api/v1/conversations</code> — lista conversas</li>
+        <li><code>POST /api/v1/conversations/:id/messages</code> — manda mensagem</li>
+        <li><code>GET /api/v1/leads</code> — lista leads</li>
+        <li><code>GET /api/v1/cards</code> — lista cards do funil</li>
+        <li><code>POST /api/v1/cards/:id/move</code> — move card</li>
+      </ul>
+
+      <h2>Webhooks</h2>
+      <p>Cadastra uma URL sua pra receber notificações automáticas:</p>
+      <ul>
+        <li><code>conversation.created</code> — nova conversa</li>
+        <li><code>card.moved</code> — card mudou de etapa</li>
+        <li><code>lead.captured</code> — IA capturou dados de lead</li>
+      </ul>
+
+      <p>📖 <strong>Documentação técnica completa:</strong> em breve em <code>/api/docs</code></p>
+    `,
+    related: ["diferenca-pro-pro-plus", "automacoes-tags"],
+  },
+  {
+    slug: "atalhos-produtividade",
+    title: "10 atalhos pra ganhar tempo todo dia",
+    category: "avancado",
+    description: "Truques de teclado e dicas de fluxo pra atendentes",
+    body: `
+      <h2>Atalhos de teclado (em conversas)</h2>
+      <ul>
+        <li><strong>Ctrl + Enter</strong> — envia mensagem (em vez de clicar)</li>
+        <li><strong>Esc</strong> — fecha modais abertos</li>
+        <li><strong>↑ / ↓</strong> — navega entre conversas na lista lateral</li>
+      </ul>
+
+      <h2>Truques de fluxo</h2>
+      <ol>
+        <li><strong>Filtra "não lidas"</strong> em /conversas pra priorizar quem está esperando</li>
+        <li><strong>Pin conversas importantes</strong> arrastando pro topo</li>
+        <li><strong>Use a sidebar do card</strong> pra mudar etapa sem sair da conversa</li>
+        <li><strong>Notas internas</strong> em cada card pra equipe ver contexto sem perguntar</li>
+        <li><strong>Templates de resposta rápida</strong> em /campanhas/templates (funciona pra atendimento individual também)</li>
+      </ol>
+
+      <h2>Configurações que economizam tempo</h2>
+      <ul>
+        <li><strong>Notificações desktop</strong> ativadas (Chrome pergunta na primeira vez)</li>
+        <li><strong>Round-robin</strong> nos times pra não brigar por conversa</li>
+        <li><strong>Auto-pause bot</strong> ativo: IA não interrompe se atendente já está respondendo</li>
+      </ul>
+
+      <h2>Hábitos dos top users</h2>
+      <ul>
+        <li>Verifica funil 5 min toda manhã (cards parados > 24h)</li>
+        <li>Adiciona resposta nova em Config IA toda vez que vê pergunta repetida</li>
+        <li>Roda 1 campanha por semana mesmo que pequena (50 contatos)</li>
+        <li>Faz teste A/B pelo menos 1x por mês</li>
+      </ul>
+    `,
+    related: ["teste-ab-campanhas", "configurar-persona-ia"],
+  },
+  {
+    slug: "metricas-avancadas",
+    title: "Métricas avançadas e forecast",
+    category: "avancado",
+    description: "Como ler números do funil pra tomar decisões",
+    body: `
+      <h2>Métricas que importam</h2>
+
+      <h3>1. Taxa de conversão por etapa</h3>
+      <p>% de cards que avançam de uma etapa pra próxima. Mostra onde você perde clientes.</p>
+      <ul>
+        <li>Novo → Qualificando: bom se > 70%</li>
+        <li>Qualificando → Proposta: bom se > 40%</li>
+        <li>Proposta → Ganho: bom se > 20%</li>
+      </ul>
+      <p>Se está abaixo, tem gargalo. Foca em melhorar essa etapa.</p>
+
+      <h3>2. Tempo médio em cada etapa</h3>
+      <p>Quanto tempo o card fica parado. Se passa de 7 dias em "Qualificando", o lead esfriou.</p>
+
+      <h3>3. Forecast (receita esperada)</h3>
+      <p>Soma de <em>(valor do card × probabilidade da etapa)</em>. Te dá previsão de quanto vai entrar.</p>
+      <p>Exemplo:</p>
+      <ul>
+        <li>5 cards em "Proposta" (50% prob) com R$ 1000 cada = R$ 2.500 esperados</li>
+        <li>3 cards em "Negociação" (75% prob) com R$ 1000 cada = R$ 2.250 esperados</li>
+        <li><strong>Total forecast = R$ 4.750</strong></li>
+      </ul>
+
+      <h3>4. Performance por atendente</h3>
+      <ul>
+        <li>Cards abertos (quanto cada um aguenta?)</li>
+        <li>Cards ganhos no mês</li>
+        <li>Valor total fechado</li>
+        <li>Tempo médio até fechar (mais rápido = melhor)</li>
+      </ul>
+
+      <h2>Onde ver</h2>
+      <p>Em <a href="/funis">/funis/[id]</a> tem botão "Métricas" que abre dashboard completo.</p>
+    `,
+    related: ["o-que-e-funil", "atalhos-produtividade"],
+  },
+
+  // =====================================================================
+  // TROUBLESHOOTING
+  // =====================================================================
+  {
+    slug: "whatsapp-nao-recebe",
+    title: "WhatsApp conectado mas não recebe mensagens",
+    category: "troubleshooting",
+    description: "Checklist pra investigar quando para de funcionar",
+    body: `
+      <h2>1. Verifica o status da instância</h2>
+      <p>Em <a href="/whatsapp">/whatsapp</a>, o badge deve estar <strong>verde "Conectado"</strong>.
+        Se está amarelo (Conectando) ou vermelho (Desconectado), <a href="/ajuda/reconectar-whatsapp">reconecta</a>.</p>
+
+      <h2>2. Manda mensagem de teste</h2>
+      <p>De outro celular, manda "oi" pro número conectado. Aguarda ~10s.</p>
+      <ul>
+        <li>Se aparecer em /conversas → tudo OK</li>
+        <li>Se não aparecer → problema de conexão</li>
+      </ul>
+
+      <h2>3. Verifica o WhatsApp no celular</h2>
+      <ul>
+        <li>Abre o WhatsApp Business no celular</li>
+        <li>Menu → Dispositivos conectados</li>
+        <li>Deve ter "FJN Atende" listado como ativo</li>
+        <li>Se não aparece ou está em vermelho → escaneia QR de novo</li>
+      </ul>
+
+      <h2>4. Reinicia a instância</h2>
+      <p>Em /whatsapp, clica no menu da instância (⋯) e escolhe <strong>Reiniciar</strong>.
+        Aguarda ~30s.</p>
+
+      <h2>5. Ainda não funciona?</h2>
+      <p>Chama no WhatsApp <a href="https://wa.me/5565980900089">(65) 98090-0089</a> com:</p>
+      <ul>
+        <li>Print do status da instância</li>
+        <li>Hora da última mensagem recebida</li>
+      </ul>
+    `,
+    related: ["como-conectar-whatsapp", "reconectar-whatsapp"],
+  },
+  {
+    slug: "ia-respondendo-errado",
+    title: "IA está respondendo errado ou genericamente",
+    category: "troubleshooting",
+    description: "Como corrigir respostas da IA",
+    body: `
+      <h2>Causa mais comum: persona genérica</h2>
+      <p>A IA Claude responde com base no que você configurou em /config.
+        Se está genérica, é porque o prompt está vago.</p>
+
+      <h2>Checklist pra ajustar</h2>
+      <ol>
+        <li><strong>Persona detalhada</strong>: não basta dizer "atendente educada". Diga "Joana, mulher 30 anos, mineira, gosta de usar 'meu bem'..."</li>
+        <li><strong>Produtos com preços</strong>: lista completa com valores. IA não pode inventar.</li>
+        <li><strong>Regras explícitas</strong>: "NUNCA prometer prazo de entrega menor que 5 dias úteis"</li>
+        <li><strong>Exemplos de boas respostas</strong>: na seção "Exemplos", cola 3-5 trocas reais que você gostou</li>
+        <li><strong>Limites</strong>: "Se perguntar sobre [tópico X], dizer que vai transferir pra humano"</li>
+      </ol>
+
+      <h2>Itera: ajusta e testa</h2>
+      <ol>
+        <li>Manda mensagem pro número de outro celular</li>
+        <li>Vê resposta da IA</li>
+        <li>Se ruim, ajusta prompt em /config</li>
+        <li>Limpa conversa (Menu da conversa → Resetar contexto) e testa de novo</li>
+      </ol>
+
+      <h2>Se confundir nomes ou trocar produtos</h2>
+      <p>Adiciona regra explícita: "O produto X custa R$ Y. NUNCA confundir com produto Z."</p>
+
+      <h2>Se inventar coisas</h2>
+      <p>Adiciona: "Se não souber a resposta exata, dizer: 'Vou verificar e te respondo em alguns minutos' e marca handoff."</p>
+    `,
+    related: ["configurar-persona-ia", "quando-ia-encaminha-humano"],
+  },
+  {
+    slug: "campanha-pausou-sozinha",
+    title: "Campanha pausou sozinha — por quê?",
+    category: "troubleshooting",
+    description: "Auto-pause é proteção, não bug",
+    body: `
+      <h2>O FJN Atende pausa campanhas automaticamente</h2>
+      <p>Isso é <strong>proteção</strong> pra evitar ban no seu número de WhatsApp. Acontece quando:</p>
+      <ul>
+        <li><strong>Taxa de falha > 20%</strong> (muitas mensagens não foram entregues)</li>
+        <li><strong>Saldo de crédito acabou</strong> e o plano excedeu cota</li>
+        <li><strong>WhatsApp desconectou</strong></li>
+      </ul>
+
+      <h2>Como diagnosticar</h2>
+      <ol>
+        <li>Abre a campanha em <a href="/campanhas">/campanhas</a></li>
+        <li>Vai na aba "Destinatários"</li>
+        <li>Filtra "Falhados" — vê o motivo</li>
+      </ol>
+
+      <h2>Motivos comuns de falha</h2>
+      <ul>
+        <li><strong>"Número não tem WhatsApp"</strong> — limpa a lista e reimporta só números válidos</li>
+        <li><strong>"Bloqueado pelo destinatário"</strong> — opt-out automático, OK</li>
+        <li><strong>"Rate limit excedido"</strong> — diminui rate_per_min pra 5 ou 8</li>
+        <li><strong>"Sem saldo"</strong> — <a href="/creditos/comprar">recarrega crédito</a></li>
+      </ul>
+
+      <h2>Retomar campanha</h2>
+      <p>Depois de resolver: na tela da campanha, clica em <strong>Retomar</strong>.
+        Vai pegar de onde parou.</p>
+    `,
+    related: ["fazer-campanha", "comprar-credito"],
+  },
+
+  // =====================================================================
+  // CASES DE USO
+  // =====================================================================
+  {
+    slug: "case-loja-roupas",
+    title: "Case — Loja de roupas online (e-commerce)",
+    category: "cases",
+    description: "Como uma loja triplicou vendas com IA atendendo 24/7",
+    body: `
+      <h2>Cenário</h2>
+      <p>Loja de roupas femininas no Instagram, 2 atendentes humanos. Recebia ~150 mensagens/dia
+        e perdia muitas vendas por não responder à noite ou nos fins de semana.</p>
+
+      <h2>Setup do FJN Atende</h2>
+      <ul>
+        <li><strong>Persona</strong>: "Lara, consultora de moda, jovem, descontraída, usa 'mana'"</li>
+        <li><strong>Produtos</strong>: catálogo completo com fotos (URLs) e preços</li>
+        <li><strong>Regras</strong>:
+          <ul>
+            <li>Se cliente perguntar tamanho, mandar tabela de medidas</li>
+            <li>Se cliente em SP, mencionar entrega no mesmo dia</li>
+            <li>Acima de R$ 200, oferecer parcelamento sem juros</li>
+          </ul>
+        </li>
+        <li><strong>Funil</strong>: 5 etapas (Curiosa → Interessada → Carrinho → Comprou / Não comprou)</li>
+      </ul>
+
+      <h2>Resultados após 60 dias</h2>
+      <ul>
+        <li>📈 Atendimento 24/7 (incluindo madrugada e domingo)</li>
+        <li>📈 Tempo de resposta caiu de 3h pra <strong>10 segundos</strong></li>
+        <li>📈 Conversão (msg → venda) subiu de 8% pra <strong>22%</strong></li>
+        <li>📈 Vendas mensais subiram <strong>3x</strong></li>
+        <li>📈 Equipe ficou pra fechar só os casos complexos (50% menos esforço)</li>
+      </ul>
+
+      <h2>Aprendizado-chave</h2>
+      <p>A IA respondeu 80% das perguntas comuns (tamanho, cor, prazo, parcelamento).
+        Humanos focaram em personalização: dúvidas sobre combinações de looks, trocas, dúvidas técnicas.</p>
+    `,
+    related: ["configurar-persona-ia", "o-que-e-funil"],
+  },
+  {
+    slug: "case-clinica",
+    title: "Case — Clínica de estética (agendamentos)",
+    category: "cases",
+    description: "Agendamento 100% automatizado com confirmação",
+    body: `
+      <h2>Cenário</h2>
+      <p>Clínica com 4 profissionais e 200+ agendamentos/mês. Secretária gastava 4h/dia
+        só confirmando e remarcando horários.</p>
+
+      <h2>Setup</h2>
+      <ul>
+        <li><strong>IA</strong> integrada com agenda externa (Google Calendar via Zapier)</li>
+        <li><strong>Funil</strong>: Agendou → Confirmado → Compareceu / Faltou</li>
+        <li><strong>Automações</strong>:
+          <ul>
+            <li>24h antes: campanha "Confirmar amanhã?" com respostas SIM/NÃO/REMARCAR</li>
+            <li>2h antes: lembrete final</li>
+            <li>1h depois: pesquisa de satisfação</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h2>Resultados</h2>
+      <ul>
+        <li>📈 No-show caiu de 25% pra <strong>8%</strong> (lembretes funcionam!)</li>
+        <li>📈 Secretária ganhou 3h/dia pra atender melhor quem chega</li>
+        <li>📈 Mais agendamentos cabem na agenda (taxa de ocupação +40%)</li>
+      </ul>
+
+      <h2>Aprendizado</h2>
+      <p>Cliente que confirma via WhatsApp <strong>respeita mais o horário</strong> do que cliente
+        que só agendou e não recebeu lembrete.</p>
+    `,
+    related: ["fazer-campanha", "o-que-e-funil"],
+  },
+  {
+    slug: "case-imobiliaria",
+    title: "Case — Imobiliária (qualificação de leads)",
+    category: "cases",
+    description: "Como qualificar leads antes de mandar pra corretor",
+    body: `
+      <h2>Cenário</h2>
+      <p>Imobiliária com 12 corretores. Recebia 300+ leads/semana via redes sociais,
+        mas corretores se queixavam: "muitos leads ruins, perco tempo".</p>
+
+      <h2>Setup</h2>
+      <ul>
+        <li><strong>IA pré-qualifica</strong>: pergunta orçamento, região, tipo de imóvel, prazo</li>
+        <li><strong>Score automático</strong>: tag "quente", "morno" ou "frio" baseado nas respostas</li>
+        <li><strong>Handoff só dos quentes</strong>: corretor recebe só leads pré-qualificados</li>
+        <li><strong>Funil</strong>: Captado → Qualificado → Visita agendada → Proposta → Fechou</li>
+        <li><strong>Time round-robin</strong>: leads quentes distribuídos entre 12 corretores</li>
+      </ul>
+
+      <h2>Resultados</h2>
+      <ul>
+        <li>📈 70% dos leads ruins filtrados antes de chegar nos corretores</li>
+        <li>📈 Corretores 3x mais produtivos (focam em quem vai fechar)</li>
+        <li>📈 Tempo médio até primeira visita caiu de 5 dias pra <strong>1 dia</strong></li>
+        <li>📈 Comissões aumentaram 60% no trimestre</li>
+      </ul>
+
+      <h2>Aprendizado</h2>
+      <p>IA NÃO substitui corretor — <strong>libera corretor pra fazer o que humano faz melhor</strong>:
+        construir relacionamento e fechar venda complexa.</p>
+    `,
+    related: ["automacoes-tags", "times-atendimento"],
+  },
+  {
+    slug: "case-saas",
+    title: "Case — SaaS B2B (suporte técnico)",
+    category: "cases",
+    description: "FAQ automatizado libera time de tickets repetitivos",
+    body: `
+      <h2>Cenário</h2>
+      <p>SaaS B2B com 5.000 clientes pagantes. Time de suporte de 3 pessoas afogado
+        com perguntas básicas ("como troco a senha?", "onde vejo a fatura?").</p>
+
+      <h2>Setup</h2>
+      <ul>
+        <li><strong>Base de conhecimento</strong> embutida na persona IA (lista de 100+ FAQs)</li>
+        <li><strong>Tags automáticas</strong>: "billing", "técnico", "feature-request", "bug"</li>
+        <li><strong>Funil por categoria</strong>: 3 pipelines (Suporte L1, Bugs, Feature requests)</li>
+        <li><strong>Handoff inteligente</strong>: se IA não resolve em 3 trocas, transfere pra humano com contexto</li>
+      </ul>
+
+      <h2>Resultados</h2>
+      <ul>
+        <li>📈 65% dos tickets resolvidos sem humano (eram FAQs)</li>
+        <li>📈 Tempo médio de resposta: <strong>15 segundos</strong> (era 4h)</li>
+        <li>📈 Time de suporte focou em bugs reais e features (que dependem de humano)</li>
+        <li>📈 NPS subiu de 32 pra 68 (clientes amam respostas instantâneas)</li>
+      </ul>
+
+      <h2>Aprendizado</h2>
+      <p>Quanto mais perguntas você ensina pra IA, mais tempo o time humano ganha.
+        Investiu 1 semana montando FAQ inicial e ganha 30h/semana desde então.</p>
+    `,
+    related: ["configurar-persona-ia", "criar-pipeline"],
   },
 ];
 

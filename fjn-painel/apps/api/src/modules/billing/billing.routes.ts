@@ -481,6 +481,77 @@ export async function billingRoutes(app: FastifyInstance) {
     return { url: portal.url };
   });
 
+  // ===================================================================
+  // SUPER ADMIN — usage analytics
+  // ===================================================================
+
+  // -------------------------------------------------------------------
+  // GET /billing/admin/usage — ranking de consumo + alertas de abuse
+  // ?period=30d|7d|today
+  // -------------------------------------------------------------------
+  app.get("/admin/usage", { preHandler: requireSuperAdmin }, async (req) => {
+    const period = (req.query as any).period ?? "30d";
+    const intervalSql = period === "today" ? "1 day" :
+                        period === "7d" ? "7 days" :
+                        "30 days";
+
+    // Ranking de consumo IA (do uso atual da subscription)
+    const ranking = await db.query(
+      `SELECT
+         t.id AS tenant_id, t.name, t.slug, t.email, t.status AS tenant_status,
+         p.name AS plan_name, p.tier,
+         s.ai_messages_used, p.included_ai_messages,
+         CASE WHEN p.included_ai_messages > 0
+              THEN ROUND((s.ai_messages_used::numeric / p.included_ai_messages) * 100, 1)
+              ELSE 0 END AS pct_used,
+         s.campaign_msgs_used, p.included_campaign_msgs,
+         s.current_period_end,
+         (SELECT COUNT(*)::int FROM conversations c WHERE c.tenant_id = t.id
+            AND c.last_message_at > NOW() - INTERVAL '${intervalSql}') AS active_conversations
+       FROM tenant_subscriptions s
+       JOIN tenants            t ON t.id = s.tenant_id
+       JOIN subscription_plans p ON p.id = s.plan_id
+      WHERE s.status = 'active'
+      ORDER BY s.ai_messages_used DESC NULLS LAST
+      LIMIT 50`,
+    );
+
+    // Alertas de abuse: tenants que excederam cota ou estão > 100%
+    const abuseAlerts = await db.query(
+      `SELECT
+         t.id AS tenant_id, t.name, t.slug, t.email,
+         p.name AS plan_name,
+         s.ai_messages_used, p.included_ai_messages,
+         s.ai_messages_used - p.included_ai_messages AS over_count,
+         ROUND((s.ai_messages_used::numeric - p.included_ai_messages) * 0.03 / 100, 2) AS overage_cost_reais
+       FROM tenant_subscriptions s
+       JOIN tenants t ON t.id = s.tenant_id
+       JOIN subscription_plans p ON p.id = s.plan_id
+      WHERE s.status = 'active'
+        AND s.ai_messages_used > p.included_ai_messages
+      ORDER BY (s.ai_messages_used - p.included_ai_messages) DESC
+      LIMIT 20`,
+    );
+
+    // Totais agregados
+    const totals = await db.query(
+      `SELECT
+         COALESCE(SUM(s.ai_messages_used), 0)::bigint        AS total_ai_messages,
+         COALESCE(SUM(s.campaign_msgs_used), 0)::bigint      AS total_campaign_msgs,
+         COUNT(*)::int FILTER (WHERE s.ai_messages_used > p.included_ai_messages) AS tenants_over_quota,
+         COUNT(*)::int FILTER (WHERE s.status = 'active')    AS active_tenants
+       FROM tenant_subscriptions s
+       JOIN subscription_plans p ON p.id = s.plan_id`,
+    );
+
+    return {
+      period,
+      totals: totals.rows[0],
+      ranking: ranking.rows,
+      abuse_alerts: abuseAlerts.rows,
+    };
+  });
+
   // -------------------------------------------------------------------
   // GET /billing/admin/events — eventos recentes (audit trail)
   // -------------------------------------------------------------------
