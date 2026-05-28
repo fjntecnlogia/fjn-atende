@@ -6,6 +6,7 @@ import {
   LayoutDashboard, MessageSquare, UsersRound, AlertTriangle,
   Settings, LogOut, Smartphone, Crown, Building2, LogIn,
   Megaphone, Wallet, Kanban, Users, CreditCard, Palette, DollarSign, HelpCircle, Activity,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTenantBranding } from "@/app/providers";
@@ -28,11 +29,12 @@ const tenantNav = [
 ];
 
 const superAdminNav = [
-  { href: "/admin",          label: "Visão Geral", icon: Crown },
-  { href: "/admin/billing",  label: "Billing",     icon: DollarSign },
-  { href: "/admin/usage",    label: "Consumo",     icon: Activity },
-  { href: "/admin/tenants",  label: "Tenants",     icon: Building2 },
-  { href: "/admin/planos",   label: "Planos",      icon: CreditCard },
+  { href: "/admin",           label: "Visão Geral", icon: Crown },
+  { href: "/admin/dashboard", label: "Dashboard",   icon: Sparkles },
+  { href: "/admin/billing",   label: "Billing",     icon: DollarSign },
+  { href: "/admin/usage",     label: "Consumo",     icon: Activity },
+  { href: "/admin/tenants",   label: "Tenants",     icon: Building2 },
+  { href: "/admin/planos",    label: "Planos",      icon: CreditCard },
 ];
 
 export function Sidebar({ realtimeConnected = false }: { realtimeConnected?: boolean }) {

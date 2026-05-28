@@ -482,6 +482,154 @@ export async function billingRoutes(app: FastifyInstance) {
   });
 
   // ===================================================================
+  // SUPER ADMIN — dashboard com gráficos (timeline 12 meses)
+  // ===================================================================
+  app.get("/admin/dashboard", { preHandler: requireSuperAdmin }, async () => {
+    // 1) MRR timeline — últimos 12 meses
+    // Pra cada mês, calcula MRR baseado em subscriptions ativas naquele mês
+    const mrrTimeline = await db.query(
+      `WITH months AS (
+         SELECT generate_series(
+           date_trunc('month', NOW() - INTERVAL '11 months'),
+           date_trunc('month', NOW()),
+           '1 month'::interval
+         ) AS month
+       )
+       SELECT
+         TO_CHAR(m.month, 'YYYY-MM') AS month_label,
+         COALESCE(SUM(
+           CASE WHEN p.billing_cycle = 'monthly' THEN p.price_cents
+                WHEN p.billing_cycle = 'annual'  THEN p.price_cents / 12
+                ELSE 0 END
+         ) FILTER (
+           WHERE s.created_at <= m.month + INTERVAL '1 month'
+             AND (s.canceled_at IS NULL OR s.canceled_at > m.month)
+             AND s.status IN ('active', 'past_due')
+         ), 0)::bigint AS mrr_cents
+       FROM months m
+       LEFT JOIN tenant_subscriptions s ON TRUE
+       LEFT JOIN subscription_plans p ON p.id = s.plan_id
+       GROUP BY m.month
+       ORDER BY m.month ASC`,
+    );
+
+    // 2) Novos clientes (signups) por mês
+    const newSignups = await db.query(
+      `WITH months AS (
+         SELECT generate_series(
+           date_trunc('month', NOW() - INTERVAL '11 months'),
+           date_trunc('month', NOW()),
+           '1 month'::interval
+         ) AS month
+       )
+       SELECT
+         TO_CHAR(m.month, 'YYYY-MM') AS month_label,
+         COUNT(t.id)::int AS signups
+       FROM months m
+       LEFT JOIN tenants t ON date_trunc('month', t.created_at) = m.month
+       GROUP BY m.month
+       ORDER BY m.month ASC`,
+    );
+
+    // 3) Novas subscriptions (pagantes) por mês
+    const newSubs = await db.query(
+      `WITH months AS (
+         SELECT generate_series(
+           date_trunc('month', NOW() - INTERVAL '11 months'),
+           date_trunc('month', NOW()),
+           '1 month'::interval
+         ) AS month
+       )
+       SELECT
+         TO_CHAR(m.month, 'YYYY-MM') AS month_label,
+         COUNT(s.id)::int AS new_subs
+       FROM months m
+       LEFT JOIN tenant_subscriptions s ON date_trunc('month', s.created_at) = m.month
+         AND s.status IN ('active', 'past_due')
+       GROUP BY m.month
+       ORDER BY m.month ASC`,
+    );
+
+    // 4) Cancellations por mês
+    const cancellations = await db.query(
+      `WITH months AS (
+         SELECT generate_series(
+           date_trunc('month', NOW() - INTERVAL '11 months'),
+           date_trunc('month', NOW()),
+           '1 month'::interval
+         ) AS month
+       )
+       SELECT
+         TO_CHAR(m.month, 'YYYY-MM') AS month_label,
+         COUNT(e.id)::int AS cancellations
+       FROM months m
+       LEFT JOIN subscription_events e
+              ON date_trunc('month', e.created_at) = m.month
+             AND e.event_type IN ('canceled', 'sub_canceled')
+       GROUP BY m.month
+       ORDER BY m.month ASC`,
+    );
+
+    // 5) Distribuição por plano (ativos hoje)
+    const planDistribution = await db.query(
+      `SELECT p.name AS plan_name, p.tier, p.billing_cycle,
+              COUNT(s.id)::int AS count,
+              SUM(p.price_cents)::bigint AS total_revenue_cents
+         FROM tenant_subscriptions s
+         JOIN subscription_plans p ON p.id = s.plan_id
+        WHERE s.status = 'active'
+        GROUP BY p.id, p.name, p.tier, p.billing_cycle
+        ORDER BY count DESC`,
+    );
+
+    // 6) Funil de conversão signup → pago (últimos 90 dias)
+    const conversionFunnel = await db.query(
+      `SELECT
+         COUNT(*)::int AS total_signups,
+         COUNT(*)::int FILTER (WHERE EXISTS (
+           SELECT 1 FROM tenant_subscriptions s
+            WHERE s.tenant_id = t.id AND s.status IN ('active', 'past_due', 'canceled')
+         )) AS started_checkout,
+         COUNT(*)::int FILTER (WHERE EXISTS (
+           SELECT 1 FROM tenant_subscriptions s
+            WHERE s.tenant_id = t.id AND s.status = 'active'
+         )) AS active_paying,
+         COUNT(*)::int FILTER (WHERE EXISTS (
+           SELECT 1 FROM tenant_subscriptions s
+            WHERE s.tenant_id = t.id AND s.status = 'canceled'
+         )) AS churned
+       FROM tenants t
+       WHERE t.created_at >= NOW() - INTERVAL '90 days'`,
+    );
+
+    // Churn rate dos últimos 30 dias (canceladas / total ativas no início do período)
+    const churnCalc = await db.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM tenant_subscriptions
+            WHERE status = 'active'
+              AND created_at <= NOW() - INTERVAL '30 days') AS active_30d_ago,
+         (SELECT COUNT(*)::int FROM subscription_events
+            WHERE event_type IN ('canceled', 'sub_canceled')
+              AND created_at > NOW() - INTERVAL '30 days') AS cancelled_30d`,
+    );
+    const active30dAgo = Number(churnCalc.rows[0]?.active_30d_ago ?? 0);
+    const cancelled30d = Number(churnCalc.rows[0]?.cancelled_30d ?? 0);
+    const churnRate = active30dAgo > 0 ? Number(((cancelled30d / active30dAgo) * 100).toFixed(2)) : 0;
+
+    return {
+      mrr_timeline: mrrTimeline.rows,
+      new_signups_timeline: newSignups.rows,
+      new_subs_timeline: newSubs.rows,
+      cancellations_timeline: cancellations.rows,
+      plan_distribution: planDistribution.rows,
+      conversion_funnel: conversionFunnel.rows[0],
+      churn_rate: churnRate,
+      churn_30d_count: cancelled30d,
+      active_30d_ago: active30dAgo,
+    };
+  });
+
+  // ===================================================================
   // SUPER ADMIN — usage analytics
   // ===================================================================
 
