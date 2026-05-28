@@ -162,11 +162,23 @@ export async function authRoutes(app: FastifyInstance) {
   // -----------------------------------------------------------------
   app.get("/me", { preHandler: requireAuth }, async (req) => {
     const result = await db.query(
-      `SELECT id, email, name, role, tenant_id FROM admin_users WHERE id = $1`,
+      `SELECT id, email, name, role, tenant_id, onboarding_completed_at
+         FROM admin_users WHERE id = $1`,
       [req.user.sub],
     );
     const user = result.rows[0];
     const tenant = req.tenantId ? await getTenant(req.tenantId) : null;
     return { user, tenant };
+  });
+
+  // -----------------------------------------------------------------
+  // POST /auth/onboarding-done — marca tour como visto
+  // -----------------------------------------------------------------
+  app.post("/onboarding-done", { preHandler: requireAuth }, async (req) => {
+    await db.query(
+      `UPDATE admin_users SET onboarding_completed_at = NOW() WHERE id = $1`,
+      [req.user.sub],
+    );
+    return { ok: true };
   });
 }

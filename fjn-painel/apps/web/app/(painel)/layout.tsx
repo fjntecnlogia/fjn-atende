@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SubscriptionBanner } from "@/components/layout/SubscriptionBanner";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useAuth } from "@/lib/auth";
 import { useRealtime } from "@/hooks/useRealtime";
 
@@ -29,6 +30,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
         <SubscriptionBanner />
         <div className="flex-1">{children}</div>
       </main>
+      <OnboardingTour />
     </div>
   );
 }
