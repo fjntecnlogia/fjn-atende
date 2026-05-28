@@ -138,7 +138,14 @@ export async function authRoutes(app: FastifyInstance) {
         to: user.email,
         userName: user.name,
         tenantName: tenant.name,
-      }).catch((err) => req.log.warn({ err }, "Falha enviando welcome email"));
+      })
+        .then(async () => {
+          await db.query(
+            `UPDATE tenants SET welcome_email_sent_at = NOW() WHERE id = $1`,
+            [tenant.id],
+          );
+        })
+        .catch((err) => req.log.warn({ err }, "Falha enviando welcome email"));
 
       return reply.code(201).send({ token, user, tenant });
     } catch (err: any) {

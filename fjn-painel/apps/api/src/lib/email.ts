@@ -223,6 +223,173 @@ export async function sendLowBalanceEmail({
   });
 }
 
+// =====================================================================
+// ONBOARDING — Dia 3 (dicas + casos de uso)
+// =====================================================================
+export interface OnboardingDay3Args {
+  to: string;
+  userName: string;
+  tenantName: string;
+}
+export async function sendOnboardingDay3Email({ to, userName, tenantName }: OnboardingDay3Args) {
+  const first = escapeHtml(userName.split(" ")[0]);
+  const body = `
+    <h1 style="font-family:'Barlow Condensed',Arial,sans-serif;font-weight:800;font-size:26px;color:#FFBA00;margin:0 0 16px;">
+      Como está indo a configuração, ${first}? 👀
+    </h1>
+    <p style="font-size:15px;line-height:1.6;color:#F4F6FF;margin:0 0 16px;">
+      Faz 3 dias que você criou sua conta da <strong>${escapeHtml(tenantName)}</strong>.
+      Separei 3 dicas que vão te dar resultado rápido:
+    </p>
+
+    <div style="background:#060C28;border:1px solid #1A2358;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-size:14px;color:#FFBA00;font-weight:700;margin:0 0 4px;">💡 Dica 1 — Personalize a persona da IA</p>
+      <p style="font-size:13px;color:rgba(244,246,255,0.8);margin:0;line-height:1.5;">
+        Em <strong>Config IA</strong>, defina nome, tom e produtos da empresa.
+        Quanto mais específico, melhor a resposta. Demora 5 min.
+      </p>
+    </div>
+
+    <div style="background:#060C28;border:1px solid #1A2358;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-size:14px;color:#FFBA00;font-weight:700;margin:0 0 4px;">📊 Dica 2 — Configure seu funil de atendimento</p>
+      <p style="font-size:13px;color:rgba(244,246,255,0.8);margin:0;line-height:1.5;">
+        Em <strong>Funis</strong>, edite as etapas pra refletir seu processo de venda real.
+        Toda conversa nova vira card automaticamente no funil padrão.
+      </p>
+    </div>
+
+    <div style="background:#060C28;border:1px solid #1A2358;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-size:14px;color:#FFBA00;font-weight:700;margin:0 0 4px;">📱 Dica 3 — Conecte o WhatsApp</p>
+      <p style="font-size:13px;color:rgba(244,246,255,0.8);margin:0;line-height:1.5;">
+        Vá em <strong>WhatsApp</strong>, gere o QR code e escaneie no celular.
+        Em 30s a IA já responde seus clientes.
+      </p>
+    </div>
+
+    <p style="text-align:center;margin:32px 0 16px;">
+      ${btnPrimary("https://atende.fjntecnologia.com.br/dashboard", "Continuar configuração")}
+    </p>
+
+    <p style="font-size:13px;color:#8A93B2;margin:24px 0 0;border-top:1px solid #1A2358;padding-top:16px;">
+      Travou em algum passo? Responde este e-mail ou chama no WhatsApp:
+      <a href="https://wa.me/5565980900089" style="color:#FFBA00;text-decoration:none;">(65) 98090-0089</a>
+    </p>
+  `;
+  await sendEmail({
+    to,
+    subject: `${first}, 3 dicas pra extrair o máximo do FJN Atende`,
+    html: wrap(body, { preview: "Dicas rápidas pra configurar IA, funil e WhatsApp." }),
+  });
+}
+
+// =====================================================================
+// ONBOARDING — Dia 7 (push pra fechar plano + cases)
+// =====================================================================
+export interface OnboardingDay7Args {
+  to: string;
+  userName: string;
+  tenantName: string;
+  hasActivePlan: boolean;
+}
+export async function sendOnboardingDay7Email({ to, userName, tenantName, hasActivePlan }: OnboardingDay7Args) {
+  const first = escapeHtml(userName.split(" ")[0]);
+
+  // Variante 1: ainda não pagou
+  if (!hasActivePlan) {
+    const body = `
+      <h1 style="font-family:'Barlow Condensed',Arial,sans-serif;font-weight:800;font-size:26px;color:#FFBA00;margin:0 0 16px;">
+        ${first}, hora de ativar seu plano 🚀
+      </h1>
+      <p style="font-size:15px;line-height:1.6;color:#F4F6FF;margin:0 0 16px;">
+        Você criou sua conta da <strong>${escapeHtml(tenantName)}</strong> há uma semana, mas ainda não escolheu um plano.
+        Vamos destravar o que o FJN Atende pode fazer pra você?
+      </p>
+
+      <h3 style="font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;font-size:18px;color:#F4F6FF;margin:24px 0 12px;">
+        O que nossos clientes estão conseguindo:
+      </h3>
+      <ul style="font-size:14px;line-height:1.7;color:rgba(244,246,255,0.85);padding-left:20px;margin:0 0 24px;">
+        <li><strong>3x mais leads convertidos</strong> com atendimento 24/7 da IA</li>
+        <li><strong>70% de redução</strong> em tempo de resposta inicial</li>
+        <li><strong>Equipe focada</strong> em atendimentos qualificados (resto a IA resolve)</li>
+        <li><strong>Funil claro</strong> pra acompanhar cada oportunidade</li>
+      </ul>
+
+      <div style="background:linear-gradient(135deg,#FFBA00 0%,#FF8800 100%);border-radius:12px;padding:20px;margin:24px 0;text-align:center;">
+        <p style="font-size:12px;color:#060C28;font-weight:700;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">
+          Comece agora — sem fidelidade
+        </p>
+        <p style="font-size:28px;color:#060C28;font-weight:800;margin:8px 0 4px;font-family:'Barlow Condensed',Arial,sans-serif;">
+          R$ 99/mês
+        </p>
+        <p style="font-size:13px;color:#060C28;margin:0 0 16px;opacity:0.85;">
+          Plano Pro · 1.000 mensagens IA/mês inclusas
+        </p>
+        <a href="https://atende.fjntecnologia.com.br/planos" style="display:inline-block;background:#060C28;color:#FFBA00;font-weight:700;text-decoration:none;padding:12px 32px;border-radius:8px;font-size:14px;">
+          Escolher meu plano →
+        </a>
+      </div>
+
+      <p style="font-size:13px;color:#8A93B2;margin:24px 0 0;border-top:1px solid #1A2358;padding-top:16px;">
+        Tem dúvida sobre qual plano escolher? Responde este e-mail que eu te ajudo a decidir.<br/>
+        <em>— Fagner, founder FJN Tecnologia</em>
+      </p>
+    `;
+    await sendEmail({
+      to,
+      subject: `${first}, ative seu plano FJN Atende — R$ 99/mês`,
+      html: wrap(body, { preview: "1 semana criando conta. Hora de ativar e começar a atender." }),
+    });
+    return;
+  }
+
+  // Variante 2: já pagou — engajamento/case
+  const body = `
+    <h1 style="font-family:'Barlow Condensed',Arial,sans-serif;font-weight:800;font-size:26px;color:#FFBA00;margin:0 0 16px;">
+      ${first}, 1 semana de FJN Atende 🎉
+    </h1>
+    <p style="font-size:15px;line-height:1.6;color:#F4F6FF;margin:0 0 16px;">
+      Obrigado por confiar no FJN Atende pra atender os clientes da <strong>${escapeHtml(tenantName)}</strong>.
+      Separei 3 hábitos dos nossos melhores usuários:
+    </p>
+
+    <div style="background:#060C28;border:1px solid #1A2358;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-size:14px;color:#FFBA00;font-weight:700;margin:0 0 4px;">🎯 1. Verifica o funil toda manhã (5 min)</p>
+      <p style="font-size:13px;color:rgba(244,246,255,0.8);margin:0;line-height:1.5;">
+        Cards parados há mais de 24h em "Qualificando" precisam de atenção. Move ou marca como perdido.
+      </p>
+    </div>
+
+    <div style="background:#060C28;border:1px solid #1A2358;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-size:14px;color:#FFBA00;font-weight:700;margin:0 0 4px;">📝 2. Atualiza a IA com termos novos</p>
+      <p style="font-size:13px;color:rgba(244,246,255,0.8);margin:0;line-height:1.5;">
+        Quando aparecer pergunta que a IA não sabe responder, adiciona resposta em Config IA. Ela aprende.
+      </p>
+    </div>
+
+    <div style="background:#060C28;border:1px solid #1A2358;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-size:14px;color:#FFBA00;font-weight:700;margin:0 0 4px;">🚀 3. Roda 1 campanha por semana</p>
+      <p style="font-size:13px;color:rgba(244,246,255,0.8);margin:0;line-height:1.5;">
+        Quem usa Campanhas converte 4x mais leads dormindo. Começa pequeno (50 contatos).
+      </p>
+    </div>
+
+    <p style="text-align:center;margin:32px 0 16px;">
+      ${btnPrimary("https://atende.fjntecnologia.com.br/dashboard", "Acessar painel")}
+    </p>
+
+    <p style="font-size:13px;color:#8A93B2;margin:24px 0 0;border-top:1px solid #1A2358;padding-top:16px;">
+      Quer compartilhar feedback ou pedir feature? Responde aqui ou WhatsApp
+      <a href="https://wa.me/5565980900089" style="color:#FFBA00;text-decoration:none;">(65) 98090-0089</a>
+    </p>
+  `;
+  await sendEmail({
+    to,
+    subject: `${first}, 3 hábitos pra extrair 10x mais do FJN Atende`,
+    html: wrap(body, { preview: "1 semana usando. Compartilho o que nossos top users fazem." }),
+  });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")

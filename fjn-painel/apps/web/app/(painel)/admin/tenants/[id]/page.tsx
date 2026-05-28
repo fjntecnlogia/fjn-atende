@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { useAuth } from "@/lib/auth";
+import { TenantNotes } from "./_components/TenantNotes";
 
 function money(c: number) {
   return `R$ ${(c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -340,6 +341,11 @@ export default function TenantDetailPage() {
             </ul>
           </div>
         )}
+      </div>
+
+      {/* ============ NOTAS INTERNAS (CRM admin) ============ */}
+      <div className="border-t border-border pt-6">
+        <TenantNotes tenantId={Number(params.id)} />
       </div>
 
       {/* ============ SEÇÃO PLANO LEGADO + STATUS ============ */}
