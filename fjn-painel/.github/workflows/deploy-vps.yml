@@ -1,0 +1,144 @@
+name: Deploy VPS
+
+# Roda em push na main quando muda algo relevante pro backend
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/**"
+      - "!apps/web/**"       # web deploya via Vercel, não via VPS
+      - "!**.md"
+      - "!.github/**"
+  # Permite disparo manual pela aba "Actions" do GitHub
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Pull + rebuild + migrate
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-vps           # evita 2 deploys simultâneos
+      cancel-in-progress: false   # espera o anterior terminar
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # precisa histórico completo pro diff de migrations
+
+      # -------------------------------------------------------------
+      # Descobre quais migrations são NOVAS neste push
+      # (compara ref anterior x atual)
+      # -------------------------------------------------------------
+      - name: Detecta migrations novas
+        id: migrations
+        run: |
+          # Se for workflow_dispatch (disparo manual), aplica TODAS as migrations
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run_all=true" >> $GITHUB_OUTPUT
+            echo "new_files=" >> $GITHUB_OUTPUT
+            echo "→ Disparo manual: vai aplicar todas as migrations"
+            exit 0
+          fi
+
+          # Push normal: pega só as migrations adicionadas neste push
+          NEW=$(git diff --name-only --diff-filter=A ${{ github.event.before }} ${{ github.sha }} \
+                | grep -E '^apps/api/src/db/migrations/[0-9]+_.*\.sql$' \
+                | sort || true)
+          if [ -z "$NEW" ]; then
+            echo "→ Nenhuma migration nova"
+          else
+            echo "→ Migrations novas encontradas:"
+            echo "$NEW"
+          fi
+          echo "run_all=false" >> $GITHUB_OUTPUT
+          {
+            echo "new_files<<EOF"
+            echo "$NEW"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      # -------------------------------------------------------------
+      # SSH pra VPS: pull + rebuild + restart container
+      # -------------------------------------------------------------
+      - name: Deploy backend
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 15m
+          script: |
+            set -e
+            echo "=== $(date) — Deploy iniciado ==="
+
+            # 1. Puxa código novo
+            cd /opt/fjn/fjn-painel
+            echo "→ git pull"
+            git pull origin main --ff-only
+
+            # 2. Rebuild + restart container (só se apps/api mudou)
+            cd /opt/fjn/infra
+            echo "→ docker compose build fjn-painel-api"
+            docker compose build fjn-painel-api
+
+            echo "→ docker compose up -d --force-recreate fjn-painel-api"
+            docker compose up -d --force-recreate fjn-painel-api
+
+            # 3. Espera container ficar healthy (~10s)
+            sleep 12
+            docker logs fjn_painel_api --tail 15
+
+            echo "=== Deploy OK — $(date) ==="
+
+      # -------------------------------------------------------------
+      # Aplica migrations novas no Postgres (se houver)
+      # -------------------------------------------------------------
+      - name: Aplica migrations novas
+        if: steps.migrations.outputs.new_files != '' || steps.migrations.outputs.run_all == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 10m
+          envs: RUN_ALL,NEW_FILES
+          script: |
+            set -e
+            cd /opt/fjn/fjn-painel/apps/api/src/db/migrations
+            if [ "$RUN_ALL" = "true" ]; then
+              echo "→ Aplicando TODAS as migrations (workflow_dispatch)"
+              for f in $(ls -1 *.sql | sort -V); do
+                echo "  ▸ $f"
+                docker exec -i atende_pg psql -U postgres -d atende -v ON_ERROR_STOP=1 < "$f"
+              done
+            else
+              echo "→ Aplicando migrations novas deste push"
+              echo "$NEW_FILES" | while read -r file; do
+                [ -z "$file" ] && continue
+                fname=$(basename "$file")
+                echo "  ▸ $fname"
+                docker exec -i atende_pg psql -U postgres -d atende -v ON_ERROR_STOP=1 < "$fname"
+              done
+            fi
+            echo "=== Migrations OK ==="
+        env:
+          RUN_ALL: ${{ steps.migrations.outputs.run_all }}
+          NEW_FILES: ${{ steps.migrations.outputs.new_files }}
+
+      # -------------------------------------------------------------
+      # Notifica sucesso (opcional — comentado pra ativar depois)
+      # -------------------------------------------------------------
+      - name: Resumo
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Deploy OK — commit ${{ github.sha }} em produção"
+          else
+            echo "❌ Deploy FALHOU — commit ${{ github.sha }}. Revise os logs acima."
+          fi
