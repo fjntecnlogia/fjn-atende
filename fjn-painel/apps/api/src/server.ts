@@ -26,6 +26,7 @@ import { billingRoutes } from "./modules/billing/billing.routes";
 import { brandingRoutes } from "./modules/branding/branding.routes";
 import { tenantNotesRoutes } from "./modules/admin/tenant-notes.routes";
 import { documentsRoutes } from "./modules/documents/documents.routes";
+import { metaWebhookRoutes } from "./modules/meta/meta-webhook.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
@@ -165,6 +166,9 @@ async function bootstrap() {
 
   // Documentos (orçamentos e contratos)
   app.register(documentsRoutes, { prefix: "/documents" });
+
+  // Meta Cloud API — webhook do WhatsApp Business Platform
+  app.register(metaWebhookRoutes, { prefix: "/meta" });
   // Atalho público pra GET /plans (sem prefix /billing pra facilitar landing)
   app.get("/plans", async () => {
     const { db } = await import("./db/client");

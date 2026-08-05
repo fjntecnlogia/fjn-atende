@@ -18,7 +18,15 @@ const schema = z.object({
   WEBHOOK_TOKEN: z.string().min(8),
 
   // Provider selecionável (espelha fjn-atendimento)
-  WHATSAPP_PROVIDER: z.enum(["ultramsg", "evolution", "wppconnect"]).default("wppconnect"),
+  WHATSAPP_PROVIDER: z.enum(["ultramsg", "evolution", "wppconnect", "meta_cloud"]).default("evolution"),
+
+  // Meta Cloud API (WhatsApp Business Platform oficial)
+  META_WA_ACCESS_TOKEN: z.string().optional().default(""),
+  META_WA_PHONE_NUMBER_ID: z.string().optional().default(""),
+  META_WA_BUSINESS_ACCOUNT_ID: z.string().optional().default(""),
+  META_WA_APP_SECRET: z.string().optional().default(""),
+  META_WA_VERIFY_TOKEN: z.string().optional().default("fjn_meta_verify_token"),
+  META_WA_API_VERSION: z.string().optional().default("v21.0"),
 
   // UltraMsg (opcional)
   ULTRAMSG_INSTANCE_ID: z.string().optional().default(""),
@@ -70,6 +78,10 @@ if (c.WHATSAPP_PROVIDER === "evolution" && (!c.EVOLUTION_BASE_URL || !c.EVOLUTIO
 }
 if (c.WHATSAPP_PROVIDER === "wppconnect" && (!c.WPPCONNECT_BASE_URL || !c.WPPCONNECT_SECRET_KEY)) {
   console.error("❌ WHATSAPP_PROVIDER=wppconnect requer WPPCONNECT_BASE_URL e WPPCONNECT_SECRET_KEY.");
+  process.exit(1);
+}
+if (c.WHATSAPP_PROVIDER === "meta_cloud" && (!c.META_WA_ACCESS_TOKEN || !c.META_WA_PHONE_NUMBER_ID)) {
+  console.error("❌ WHATSAPP_PROVIDER=meta_cloud requer META_WA_ACCESS_TOKEN e META_WA_PHONE_NUMBER_ID.");
   process.exit(1);
 }
 

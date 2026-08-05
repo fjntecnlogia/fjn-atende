@@ -490,15 +490,17 @@ export async function documentsRoutes(app: FastifyInstance) {
       const pdfBase64 = pdf.toString("base64");
       const filename = `${docLabel}-${String(doc.number).padStart(4, "0")}.pdf`;
 
-      // Envia via WPP-Connect
-      if (config.WHATSAPP_PROVIDER === "wppconnect") {
+      // Envia via provider ativo
+      const provider = config.WHATSAPP_PROVIDER;
+
+      if (provider === "wppconnect") {
         // 1) Texto
         await axios.post(
           `${config.WPPCONNECT_BASE_URL}/api/${config.WPPCONNECT_SESSION}/send-message`,
           { phone: cleanPhone, message: finalMsg },
           { headers: { Authorization: `Bearer ${config.WPPCONNECT_SESSION_TOKEN}` } },
         );
-        // 2) PDF como base64
+        // 2) PDF base64
         await axios.post(
           `${config.WPPCONNECT_BASE_URL}/api/${config.WPPCONNECT_SESSION}/send-file-base64`,
           {
@@ -509,8 +511,61 @@ export async function documentsRoutes(app: FastifyInstance) {
           },
           { headers: { Authorization: `Bearer ${config.WPPCONNECT_SESSION_TOKEN}` } },
         );
+
+      } else if (provider === "evolution") {
+        // Evolution API v2 — endpoints /message/sendText e /message/sendMedia
+        // Instance name: primeira instância ativa do tenant (busca no banco)
+        const instRes = await db.query(
+          `SELECT session_name FROM whatsapp_instances
+            WHERE tenant_id = $1 AND status = 'connected'
+            ORDER BY id ASC LIMIT 1`,
+          [req.tenantId],
+        );
+        const instanceName = instRes.rows[0]?.session_name;
+        if (!instanceName) {
+          return reply.code(400).send({ error: "nenhuma instância WhatsApp conectada" });
+        }
+
+        const evoHeaders = { apikey: config.EVOLUTION_API_KEY, "Content-Type": "application/json" };
+
+        // 1) Texto
+        await axios.post(
+          `${config.EVOLUTION_BASE_URL}/message/sendText/${instanceName}`,
+          { number: cleanPhone, text: finalMsg },
+          { headers: evoHeaders },
+        );
+        // 2) PDF como mídia (base64)
+        await axios.post(
+          `${config.EVOLUTION_BASE_URL}/message/sendMedia/${instanceName}`,
+          {
+            number: cleanPhone,
+            mediatype: "document",
+            mimetype: "application/pdf",
+            media: pdfBase64,  // Evolution aceita base64 puro sem prefixo data:
+            fileName: filename,
+            caption: `${docLabel.charAt(0).toUpperCase() + docLabel.slice(1)} #${String(doc.number).padStart(4, "0")}`,
+          },
+          { headers: evoHeaders },
+        );
+
+      } else if (provider === "meta_cloud") {
+        // Meta Cloud API — implementado em lib/meta-cloud.ts
+        const { sendMetaMessage, sendMetaDocument } = await import("../../lib/meta-cloud");
+        await sendMetaMessage({
+          tenantId: req.tenantId!,
+          to: cleanPhone,
+          text: finalMsg,
+        });
+        await sendMetaDocument({
+          tenantId: req.tenantId!,
+          to: cleanPhone,
+          pdfBase64,
+          filename,
+          caption: `${docLabel.charAt(0).toUpperCase() + docLabel.slice(1)} #${String(doc.number).padStart(4, "0")}`,
+        });
+
       } else {
-        return reply.code(501).send({ error: `Envio via WhatsApp não implementado para provider ${config.WHATSAPP_PROVIDER}` });
+        return reply.code(501).send({ error: `Provider WhatsApp '${provider}' não suportado` });
       }
 
       // Marca como enviado
