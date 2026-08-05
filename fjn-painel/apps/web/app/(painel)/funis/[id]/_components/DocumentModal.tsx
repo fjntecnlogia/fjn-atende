@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, X, Plus, Trash2, Send, Download, CheckCircle2, XCircle,
-  RefreshCw, ArrowRight, MessageSquare, Loader2,
+  RefreshCw, ArrowRight, MessageSquare, Loader2, FileSignature, ExternalLink,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
@@ -280,6 +280,28 @@ function DocumentEditor({ documentId, onBack }: { documentId: number; onBack: ()
     onError: (e: any) => toast.error(e?.response?.data?.error ?? "Erro"),
   });
 
+  const signMut = useMutation({
+    mutationFn: async () =>
+      (await api.post(`/documents/${documentId}/sign-request`, { deadline_days: 30 })).data,
+    onSuccess: (data) => {
+      toast.success("Enviado pra assinatura no Clicksign!");
+      refetch();
+      if (data.sign_url) {
+        if (confirm("Abrir página de assinatura em nova aba?")) {
+          window.open(data.sign_url, "_blank");
+        }
+      }
+    },
+    onError: (e: any) => {
+      const msg = e?.response?.data?.error ?? "Erro";
+      if (msg.includes("CLICKSIGN_API_TOKEN")) {
+        toast.error("Assinatura digital não configurada. Contate o super-admin.", { duration: 5000 });
+      } else {
+        toast.error(msg);
+      }
+    },
+  });
+
   if (!doc) return <div className="flex-1 p-8 flex items-center justify-center"><Loader2 className="animate-spin text-orange" /></div>;
 
   const isEditable = ["draft", "sent", "viewed", "rejected"].includes(doc.status);
@@ -461,6 +483,30 @@ function DocumentEditor({ documentId, onBack }: { documentId: number; onBack: ()
                     className="btn-primary text-sm flex items-center gap-2 ml-auto">
               Converter em contrato <ArrowRight size={14} />
             </button>
+          )}
+          {doc.type === "contract" && !doc.signature_request_id && (doc.status === "draft" || doc.status === "approved") && (
+            <button onClick={() => signMut.mutate()}
+                    disabled={signMut.isPending}
+                    className="text-sm py-2 px-3 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center gap-2 ml-auto font-bold">
+              {signMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSignature size={14} />}
+              Enviar pra assinatura digital
+            </button>
+          )}
+          {doc.signature_request_id && !doc.signed_at && (
+            <div className="text-sm text-blue-400 ml-auto flex items-center gap-2 font-bold">
+              <Loader2 size={14} className="animate-pulse" /> Aguardando assinatura...
+            </div>
+          )}
+          {doc.signed_at && (
+            <div className="text-sm text-green-400 ml-auto flex items-center gap-2 font-bold">
+              <CheckCircle2 size={14} /> Assinado em {new Date(doc.signed_at).toLocaleDateString("pt-BR")}
+              {doc.signed_pdf_url && (
+                <a href={doc.signed_pdf_url} target="_blank" rel="noreferrer"
+                   className="text-xs underline flex items-center gap-1">
+                  <ExternalLink size={10} /> Baixar assinado
+                </a>
+              )}
+            </div>
           )}
         </div>
 

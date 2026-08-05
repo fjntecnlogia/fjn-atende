@@ -45,6 +45,11 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional().default(""),
   RESEND_FROM: z.string().optional().default("FJN Atende <noreply@fjntecnologia.com.br>"),
   RESEND_REPLY_TO: z.string().optional().default("fjntecnologia2022@gmail.com"),
+
+  // Clicksign (assinatura digital)
+  CLICKSIGN_API_TOKEN: z.string().optional().default(""),
+  CLICKSIGN_BASE_URL: z.string().optional().default("https://app.clicksign.com"),
+  CLICKSIGN_WEBHOOK_SECRET: z.string().optional().default(""),
 });
 
 const parsed = schema.safeParse(process.env);

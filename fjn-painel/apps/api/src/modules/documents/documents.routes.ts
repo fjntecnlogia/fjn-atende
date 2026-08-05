@@ -35,6 +35,7 @@ import { db } from "../../db/client";
 import { config } from "../../config";
 import { requireTenant, requireRole } from "../../lib/auth";
 import { generateDocumentPdf } from "../../lib/pdf-generator";
+import { sendForSignature, getDocument as csGetDocument, isClicksignEnabled } from "../../lib/clicksign";
 
 // =====================================================================
 // SCHEMAS
@@ -690,5 +691,203 @@ export async function documentsRoutes(app: FastifyInstance) {
     } finally {
       client.release();
     }
+  });
+
+  // ==================================================================
+  // ASSINATURA DIGITAL (Clicksign)
+  // ==================================================================
+
+  // POST /:id/sign-request — envia contrato pra Clicksign
+  app.post("/:id/sign-request", { preHandler: requireTenant }, async (req, reply) => {
+    if (!isClicksignEnabled()) {
+      return reply.code(503).send({
+        error: "assinatura digital indisponível — configure CLICKSIGN_API_TOKEN no .env",
+      });
+    }
+
+    const id = Number((req.params as any).id);
+    const { deadline_days } = z.object({
+      deadline_days: z.number().int().min(1).max(365).default(30),
+    }).parse(req.body ?? {});
+
+    const docRes = await db.query(
+      `SELECT * FROM documents WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId],
+    );
+    if (docRes.rowCount === 0) return reply.code(404).send({ error: "documento não encontrado" });
+    const doc = docRes.rows[0];
+
+    if (doc.type !== "contract") {
+      return reply.code(400).send({ error: "só é possível assinar contratos" });
+    }
+    if (!doc.client_email) {
+      return reply.code(400).send({ error: "e-mail do cliente obrigatório pra assinatura" });
+    }
+    if (doc.signature_request_id) {
+      return reply.code(400).send({ error: "documento já enviado pra assinatura" });
+    }
+
+    try {
+      const pdf = await generateDocumentPdf(id);
+      const pdfBase64 = pdf.toString("base64");
+      const filename = `contrato-${String(doc.number).padStart(4, "0")}.pdf`;
+
+      const result = await sendForSignature({
+        pdfBase64,
+        filename,
+        clientEmail: doc.client_email,
+        clientName: doc.client_name ?? "Cliente",
+        clientPhone: doc.client_phone
+          ? `+${String(doc.client_phone).replace(/\D/g, "")}`
+          : undefined,
+        clientDocument: doc.client_document
+          ? String(doc.client_document).replace(/\D/g, "")
+          : undefined,
+        deadlineDays: deadline_days,
+      });
+
+      await db.query(
+        `UPDATE documents SET
+           signature_provider = 'clicksign',
+           signature_request_id = $1,
+           status = 'sent',
+           sent_at = COALESCE(sent_at, NOW()),
+           updated_at = NOW()
+         WHERE id = $2`,
+        [result.documentKey, id],
+      );
+      await logEvent(id, req.tenantId!, "signature_requested", {
+        provider: "clicksign",
+        document_key: result.documentKey,
+        deadline_days,
+      }, req.user.sub);
+
+      return {
+        ok: true,
+        provider: "clicksign",
+        document_key: result.documentKey,
+        sign_url: result.signPageUrl,
+      };
+    } catch (err: any) {
+      req.log.error({ err: err.message, body: err.response?.data }, "Erro Clicksign");
+      return reply.code(500).send({ error: "Falha no Clicksign: " + err.message });
+    }
+  });
+
+  // GET /:id/sign-status — checa status atual no Clicksign
+  app.get("/:id/sign-status", { preHandler: requireTenant }, async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const r = await db.query(
+      `SELECT signature_provider, signature_request_id, signed_at, signed_pdf_url, status
+         FROM documents WHERE id = $1 AND tenant_id = $2`,
+      [id, req.tenantId],
+    );
+    if (r.rowCount === 0) return reply.code(404).send({ error: "documento não encontrado" });
+    const doc = r.rows[0];
+    if (!doc.signature_request_id) return { has_signature: false };
+
+    try {
+      const csDoc = await csGetDocument(doc.signature_request_id);
+      // Auto-atualiza se detectou finalização
+      if (csDoc.status === "closed" && !doc.signed_at) {
+        await db.query(
+          `UPDATE documents SET
+             signed_at = NOW(),
+             signed_pdf_url = $1,
+             status = 'signed',
+             updated_at = NOW()
+           WHERE id = $2`,
+          [csDoc.downloads?.signed_file_url ?? null, id],
+        );
+        await logEvent(id, req.tenantId!, "signed", {
+          provider: doc.signature_provider,
+          signed_pdf_url: csDoc.downloads?.signed_file_url,
+        }, req.user.sub);
+      }
+      return {
+        has_signature: true,
+        clicksign_status: csDoc.status,
+        signed_at: doc.signed_at,
+        signed_pdf_url: doc.signed_pdf_url,
+      };
+    } catch (err: any) {
+      return { has_signature: true, error: err.message };
+    }
+  });
+
+  // ==================================================================
+  // WEBHOOK CLICKSIGN — chega quando doc é assinado/finalizado
+  // ==================================================================
+  app.post("/clicksign-webhook", async (req, reply) => {
+    // Clicksign envia POST com JSON: { event: {name: 'auto_close', data: {document: {key, downloads}}} }
+    const body: any = req.body ?? {};
+    const eventName = body?.event?.name;
+    const docKey = body?.document?.key ?? body?.event?.data?.document?.key;
+    if (!eventName || !docKey) {
+      return reply.code(400).send({ error: "payload inválido" });
+    }
+
+    req.log.info({ event: eventName, doc: docKey }, "Clicksign webhook");
+
+    const docRes = await db.query(
+      `SELECT id, tenant_id, card_id FROM documents WHERE signature_request_id = $1`,
+      [docKey],
+    );
+    if (docRes.rowCount === 0) {
+      req.log.warn({ docKey }, "Doc do Clicksign não encontrado no banco");
+      return { received: true };
+    }
+    const doc = docRes.rows[0];
+
+    if (eventName === "auto_close" || eventName === "sign" || eventName === "close") {
+      // Documento assinado → marca signed + tenta puxar URL do PDF assinado
+      let signedUrl: string | null = null;
+      try {
+        const csDoc = await csGetDocument(docKey);
+        signedUrl = csDoc.downloads?.signed_file_url ?? null;
+      } catch { /* ignora */ }
+
+      await db.query(
+        `UPDATE documents SET
+           signed_at = NOW(),
+           signed_pdf_url = $1,
+           status = 'signed',
+           updated_at = NOW()
+         WHERE id = $2`,
+        [signedUrl, doc.id],
+      );
+      await logEvent(doc.id, doc.tenant_id, "signed", {
+        provider: "clicksign",
+        event: eventName,
+        signed_pdf_url: signedUrl,
+      });
+
+      // Se tem card vinculado, avança pra etapa is_won
+      if (doc.card_id) {
+        const wonStageRes = await db.query(
+          `SELECT s.id FROM pipeline_stages s
+             JOIN conversation_cards c ON c.pipeline_id = s.pipeline_id
+            WHERE c.id = $1 AND s.is_won = TRUE
+            LIMIT 1`,
+          [doc.card_id],
+        );
+        if (wonStageRes.rowCount) {
+          await db.query(
+            `SELECT move_card_to_stage($1, $2, NULL, 'Contrato assinado via Clicksign')`,
+            [doc.card_id, wonStageRes.rows[0].id],
+          );
+        }
+      }
+    } else if (eventName === "refusal" || eventName === "cancel") {
+      await db.query(
+        `UPDATE documents SET status = 'rejected',
+           rejected_at = NOW(), rejected_reason = 'Recusado no Clicksign', updated_at = NOW()
+         WHERE id = $1`,
+        [doc.id],
+      );
+      await logEvent(doc.id, doc.tenant_id, "rejected", { source: "clicksign_webhook", event: eventName });
+    }
+
+    return { received: true };
   });
 }
