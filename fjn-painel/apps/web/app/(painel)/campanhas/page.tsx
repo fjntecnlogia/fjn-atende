@@ -6,6 +6,7 @@ import { Megaphone, FolderOpen, FileText, Plus, Play, Pause, CheckCircle2, XCirc
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { relativeTime } from "@/lib/utils";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 const statusBadge: Record<string, { label: string; variant: any }> = {
   draft:      { label: "Rascunho",   variant: "default" },
@@ -50,8 +51,20 @@ export default function CampanhasPage() {
         </div>
       </div>
 
+      <PageIntro
+        storageKey="campanhas-intro"
+        title="Como fazer uma campanha em 3 passos"
+        description="Disparo em massa via WhatsApp com anti-ban integrado. Rate-limit configurável, jitter aleatório e opt-out automático protegem seu número."
+        steps={[
+          "Cria/importa uma Lista de contatos (CSV com phone + name + vars)",
+          "Cria um Template de mensagem (pode usar {{nome}} pra personalizar)",
+          "Nova campanha: conecta lista + template + agenda + rate (recomendo 10/min)",
+        ]}
+        helpArticle={{ slug: "fazer-campanha", label: "Guia completo de Campanhas" }}
+      />
+
       {/* Alerta sobre uso responsável */}
-      <div className="card p-4 bg-orange/5 border-orange/30">
+      <div className="card p-4 bg-red-500/5 border-red-500/30">
         <p className="text-xs text-light/90">
           ⚠️ <strong>Uso responsável:</strong> dispare apenas para contatos que <em>autorizaram</em> receber suas mensagens.
           O WhatsApp pode banir números que enviam SPAM. Use rate-limit (10/min) e respeite opt-outs.

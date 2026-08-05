@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, Star, Crown, Zap, Sparkles, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 interface Plan {
   id: number;
@@ -101,6 +102,19 @@ export default function PlanosPage() {
           Cancele quando quiser. Sem fidelidade.
         </p>
       </div>
+
+      <PageIntro
+        storageKey="planos-intro"
+        title="Compare planos e escolha o ideal"
+        description="Cobrança recorrente via Stripe. Mensal ou anual (20% off). Cancela quando quiser — sem fidelidade nem multa."
+        steps={[
+          "Pro (R$ 99/mês): 1 instância, 3 usuários, 1 funil, 1.000 msgs IA inclusas",
+          "Pro+ (R$ 299/mês): 3 instâncias, 10 usuários, múltiplos funis, times, 5.000 msgs IA",
+          "Excedente da cota é debitado do saldo pré-pago (R$ 0,03 por msg IA extra)",
+          "Upgrade em cima do plano atual é prorateado (paga só a diferença)",
+        ]}
+        helpArticle={{ slug: "diferenca-pro-pro-plus", label: "Pro vs Pro+ em detalhes" }}
+      />
 
       {/* Toggle Mensal/Anual */}
       <div className="flex items-center justify-center gap-3">

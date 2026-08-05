@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { Badge } from "@/components/ui/Badge";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 function formatCents(c: number | string): string {
   return `R$ ${(Number(c) / 100).toFixed(2).replace(".", ",")}`;
@@ -67,6 +68,19 @@ export default function CreditosPage() {
           <Plus size={14} /> Comprar créditos
         </Link>
       </div>
+
+      <PageIntro
+        storageKey="creditos-intro"
+        title="Créditos = combustível pra IA e campanhas extras"
+        description="Seu plano vem com uma cota mensal de mensagens IA e campanhas. Se estourar a cota, o excedente é debitado do saldo pré-pago aqui."
+        steps={[
+          "Cada mensagem IA extra custa R$ 0,03 (~3.300 msgs por R$ 100)",
+          "Campanhas WhatsApp têm preço por provider — WPP-Connect ~R$ 0,005/msg",
+          "Recarga via PIX, cartão ou boleto — pacotes maiores dão bônus",
+          "Alerta automático por e-mail quando saldo cai abaixo de R$ 10",
+        ]}
+        helpArticle={{ slug: "comprar-credito", label: "Como funcionam os créditos" }}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

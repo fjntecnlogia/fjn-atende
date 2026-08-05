@@ -6,6 +6,7 @@ import { Save, FileText, Bot, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 interface Persona {
   ai_persona?: { name?: string; tone?: string; rules?: string[] };
@@ -28,6 +29,19 @@ export default function ConfigPage() {
         </h1>
         <p className="text-sm text-gray2 mt-1">Personalize a persona e os conhecimentos da IA atendente</p>
       </div>
+
+      <PageIntro
+        storageKey="config-ia-intro"
+        title="Ensine a IA a atender como sua empresa atenderia"
+        description="Aqui você define quem a IA é (persona) e o que ela sabe (dossiês). Quanto mais específico, melhor o atendimento — evite prompts genéricos tipo 'atendente educada'."
+        steps={[
+          "Persona: nome, tom de voz, regras (ex: 'Nunca prometer prazo menor que 5 dias')",
+          "Prompt master: contexto adicional que vai em toda conversa (produtos, preços, políticas)",
+          "Dossiês: blocos de conhecimento que a IA consulta (ex: FAQ, tabela de preços, procedimentos)",
+          "Teste manda mensagem pro seu próprio número de outro celular pra validar",
+        ]}
+        helpArticle={{ slug: "configurar-persona-ia", label: "Guia de configuração da IA" }}
+      />
 
       <div className="flex gap-2 border-b border-border">
         <TabBtn active={tab === "persona"}   onClick={() => setTab("persona")}>Persona & Prompt</TabBtn>

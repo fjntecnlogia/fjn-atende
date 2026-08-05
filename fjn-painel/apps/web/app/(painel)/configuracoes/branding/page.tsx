@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Palette, Upload, Globe, Mail, Phone, EyeOff, Image as ImageIcon, Crown, Lock, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 interface Branding {
   name: string;
@@ -120,6 +121,19 @@ export default function BrandingPage() {
           Personalize logo, cores e contato exibidos no painel
         </p>
       </div>
+
+      <PageIntro
+        storageKey="branding-intro"
+        title="Personalize sua marca no painel"
+        description="Substitui logo e cores padrão do FJN Atende pelas suas. Ideal pra impressionar clientes e reforçar sua identidade visual."
+        steps={[
+          "Faz upload do logo (PNG/SVG até 100KB) ou cola URL externa",
+          "Escolhe cores primária (fundo) e destaque (botões, links)",
+          "Preview aparece no topo em tempo real",
+          "Pro+ ganha subdomain próprio (ex: minhaempresa.atende.fjntecnologia.com.br)",
+        ]}
+        helpArticle={{ slug: "personalizar-marca", label: "Guia de white-label" }}
+      />
 
       {!canUseBranding && (
         <div className="card p-4 bg-orange/10 border-orange/40">

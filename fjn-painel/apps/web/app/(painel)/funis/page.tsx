@@ -7,6 +7,7 @@ import { Kanban, Plus, Star, Briefcase, MessageSquare, Headphones, Heart, Trash2
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 const iconMap: Record<string, any> = {
   briefcase: Briefcase,
@@ -75,6 +76,19 @@ export default function FunisPage() {
           <Plus size={14} /> Novo funil
         </button>
       </div>
+
+      <PageIntro
+        storageKey="funis-intro"
+        title="Como funciona o Funil"
+        description="Toda conversa nova do WhatsApp vira automaticamente um card na primeira etapa do funil padrão (marcado com ⭐). Você arrasta cards entre etapas conforme avança a venda."
+        steps={[
+          "Cada funil tem etapas customizáveis (ex: Novo → Qualificando → Proposta → Ganho)",
+          "Cliente Pro tem 1 funil. Pro+ tem múltiplos funis (Comercial, Suporte, etc)",
+          "Cards mostram valor da oportunidade, atendente, tags e tempo na etapa",
+          "Métricas de conversão e forecast disponíveis dentro do Kanban",
+        ]}
+        helpArticle={{ slug: "o-que-e-funil", label: "Guia completo do Funil" }}
+      />
 
       {/* Card de criação */}
       {showCreate && (

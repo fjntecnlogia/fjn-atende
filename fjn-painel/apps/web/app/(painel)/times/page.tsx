@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Plus, Crown, Shuffle, Hand, Activity, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 interface Team {
   id: number;
@@ -123,6 +124,19 @@ export default function TimesPage() {
           <Plus size={14} /> Novo time
         </button>
       </div>
+
+      <PageIntro
+        storageKey="times-intro"
+        title="Como funcionam os Times"
+        description="Times agrupam atendentes e definem como as conversas são distribuídas. Útil quando você tem mais de 1 pessoa atendendo."
+        steps={[
+          "Cria um time (ex: Comercial, Suporte) e adiciona os usuários",
+          "Escolhe estratégia: Manual (atendente pega) | Round-robin (revezamento) | Menos ocupado",
+          "Conversas novas são distribuídas automaticamente entre membros disponíveis",
+          "Cada atendente vê só as conversas atribuídas a ele ou ao seu time",
+        ]}
+        helpArticle={{ slug: "times-atendimento", label: "Guia de Times e Round-Robin" }}
+      />
 
       {/* Criar */}
       {showCreate && (

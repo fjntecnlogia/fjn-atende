@@ -8,6 +8,7 @@ import Image from "next/image";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { relativeTime } from "@/lib/utils";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 interface Instance {
   id: number;
@@ -103,6 +104,20 @@ export default function WhatsAppPage() {
           <Plus size={14} /> Nova instância
         </button>
       </div>
+
+      <PageIntro
+        storageKey="whatsapp-intro"
+        title="Como conectar seu WhatsApp Business"
+        description="Cada instância é um número WhatsApp diferente. Você precisa de chip dedicado (não use número pessoal) + WhatsApp Business instalado no celular."
+        steps={[
+          'Clica em "Nova instância" e dá um nome (ex: "Vendas")',
+          'Clica "Gerar QR Code" — vai aparecer um QR na tela',
+          'No celular: WhatsApp Business → Menu → Dispositivos conectados → Conectar dispositivo',
+          "Escaneia o QR — em ~10s status muda pra Conectado ✅",
+          "A partir daí, toda mensagem que chegar é processada pela IA e vai pro painel",
+        ]}
+        helpArticle={{ slug: "como-conectar-whatsapp", label: "Guia detalhado + solução de problemas" }}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {instances.map((inst) => (

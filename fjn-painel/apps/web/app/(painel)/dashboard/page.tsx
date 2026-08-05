@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { api } from "@/lib/api";
 import { KpiCard } from "@/components/ui/KpiCard";
 import type { DashboardOverview } from "@fjn-painel/shared";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 const productLabels: Record<string, string> = {
   stylogestor: "STYLOGESTOR",
@@ -27,8 +28,19 @@ export default function DashboardPage() {
     <div className="p-8 space-y-8">
       <div>
         <h1 className="font-display text-3xl font-extrabold">Dashboard</h1>
-        <p className="text-sm text-gray2 mt-1">Visão geral em tempo real — FJN Tecnologia</p>
+        <p className="text-sm text-gray2 mt-1">Visão geral em tempo real</p>
       </div>
+
+      <PageIntro
+        storageKey="dashboard-intro"
+        title="Sua central de operação"
+        description="Aqui você vê o pulso do seu atendimento em tempo real — conversas ativas, leads capturados, mensagens enviadas hoje e handoffs pendentes."
+        steps={[
+          "KPIs atualizados a cada 10 segundos",
+          "Clique em qualquer card pra ir pra tela detalhada",
+          "Verde = OK · Laranja = atenção · Vermelho = ação urgente",
+        ]}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">

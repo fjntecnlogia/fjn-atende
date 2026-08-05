@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
+import { PageIntro } from "@/components/layout/PageIntro";
 
 function money(c: number) {
   return `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
@@ -104,6 +105,19 @@ export default function ConfiguracoesPlanoPage() {
           Sua assinatura
         </h1>
       </div>
+
+      <PageIntro
+        storageKey="plano-intro"
+        title="Gerencie sua assinatura em um só lugar"
+        description="Aqui você vê plano ativo, cota mensal restante, próxima cobrança e histórico de pagamentos. Pode cancelar, reativar ou mudar de plano sem falar com suporte."
+        steps={[
+          "Ver cota mensal restante de mensagens IA e campanhas",
+          '"Mudar plano" abre /planos com toggle Mensal/Anual (20% off)',
+          '"Stripe Portal" abre painel Stripe pra atualizar cartão ou ver faturas',
+          '"Cancelar" mantém acesso até fim do período pago (pode reativar)',
+        ]}
+        helpArticle={{ slug: "como-funcionam-planos", label: "Guia de planos e cobrança" }}
+      />
 
       {/* Banner past_due */}
       {isPastDue && (
