@@ -25,6 +25,7 @@ import { funnelMetricsRoutes } from "./modules/funnel/metrics.routes";
 import { billingRoutes } from "./modules/billing/billing.routes";
 import { brandingRoutes } from "./modules/branding/branding.routes";
 import { tenantNotesRoutes } from "./modules/admin/tenant-notes.routes";
+import { documentsRoutes } from "./modules/documents/documents.routes";
 import { shutdownDb } from "./db/client";
 import { registerSocket, startRealtime, stopRealtime } from "./lib/realtime";
 import { startCampaignWorker, stopCampaignWorker } from "./jobs/campaigns-sender";
@@ -161,6 +162,9 @@ async function bootstrap() {
 
   // CRM admin — notas internas por tenant
   app.register(tenantNotesRoutes, { prefix: "/admin/tenant-notes" });
+
+  // Documentos (orçamentos e contratos)
+  app.register(documentsRoutes, { prefix: "/documents" });
   // Atalho público pra GET /plans (sem prefix /billing pra facilitar landing)
   app.get("/plans", async () => {
     const { db } = await import("./db/client");

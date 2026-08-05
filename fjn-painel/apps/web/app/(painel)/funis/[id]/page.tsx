@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
+import { DocumentModal } from "./_components/DocumentModal";
 
 interface Stage {
   id: number;
@@ -290,6 +291,7 @@ export default function KanbanPage() {
   const pipelineId = Number(params.id);
   const qc = useQueryClient();
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [docModalCard, setDocModalCard] = useState<Card | null>(null);
 
   const { data: pipeline } = useQuery<any>({
     queryKey: ["pipeline", pipelineId],
@@ -330,8 +332,8 @@ export default function KanbanPage() {
   }
 
   function handleOpenContract(cardId: number) {
-    // Placeholder Release 1 — abrir modal de contrato vem no Release 2
-    toast("Contrato/Orçamento em breve (Release 2)", { icon: "🚧", duration: 3000 });
+    const card = cards.find((c) => c.id === cardId);
+    if (card) setDocModalCard(card);
   }
 
   const sensors = useSensors(
@@ -450,6 +452,16 @@ export default function KanbanPage() {
           )}
         </DragOverlay>
       </DndContext>
+
+      {docModalCard && (
+        <DocumentModal
+          cardId={docModalCard.id}
+          cardConversationId={docModalCard.conversation_id}
+          cardContactName={docModalCard.contact_name}
+          cardContactPhone={docModalCard.contact_phone}
+          onClose={() => setDocModalCard(null)}
+        />
+      )}
     </div>
   );
 }
