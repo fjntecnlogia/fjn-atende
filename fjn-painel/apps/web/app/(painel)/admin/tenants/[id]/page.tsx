@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import {
   Building2, ArrowLeft, ExternalLink, DollarSign, Calendar,
   Sparkles, AlertTriangle, RefreshCw, CreditCard, CheckCircle2,
-  XCircle, Activity, TrendingUp, Plus, ShieldCheck,
+  XCircle, Activity, TrendingUp, Plus, ShieldCheck, Gift, X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
@@ -48,6 +49,7 @@ export default function TenantDetailPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const setActiveTenant = useAuth((s) => s.setActiveTenant);
+  const [showTrialModal, setShowTrialModal] = useState(false);
 
   const { data: tenant, isLoading } = useQuery<any>({
     queryKey: ["tenant", params.id],
@@ -252,6 +254,10 @@ export default function TenantDetailPage() {
             <div className="card p-5 space-y-3">
               <h3 className="font-bold text-light text-sm uppercase tracking-widest text-gray2">Ações admin</h3>
 
+              <button onClick={() => setShowTrialModal(true)}
+                      className="w-full text-sm py-2 rounded-lg bg-orange/15 hover:bg-orange/25 border border-orange/40 text-orange flex items-center justify-center gap-2 transition-colors font-bold">
+                <Gift size={14} /> Ativar trial
+              </button>
               <button onClick={() => extendMut.mutate(7)}
                       className="btn-ghost w-full text-sm flex items-center justify-center gap-2">
                 <Plus size={14} /> Conceder +7 dias
@@ -384,6 +390,132 @@ export default function TenantDetailPage() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Modal Trial Admin */}
+      {showTrialModal && (
+        <TrialModal
+          tenantId={Number(params.id)}
+          tenantName={tenant.name}
+          onClose={() => setShowTrialModal(false)}
+          onSuccess={() => {
+            setShowTrialModal(false);
+            qc.invalidateQueries({ queryKey: ["tenant-billing", params.id] });
+            qc.invalidateQueries({ queryKey: ["tenant", params.id] });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// =====================================================================
+// Modal — Ativar trial admin
+// =====================================================================
+function TrialModal({
+  tenantId, tenantName, onClose, onSuccess,
+}: {
+  tenantId: number;
+  tenantName: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [days, setDays] = useState(30);
+  const [planSlug, setPlanSlug] = useState("pro_plus_monthly");
+  const [reason, setReason] = useState("");
+
+  const { data: plansData } = useQuery<any>({
+    queryKey: ["plans"],
+    queryFn: async () => (await api.get("/plans")).data,
+  });
+  const plans = plansData?.items?.filter((p: any) => p.billing_cycle === "monthly") ?? [];
+
+  const trialMut = useMutation({
+    mutationFn: async () => (await api.post(`/billing/admin/tenant/${tenantId}/trial`, {
+      days,
+      plan_slug: planSlug,
+      reason: reason || undefined,
+    })).data,
+    onSuccess: (data) => {
+      toast.success(`Trial de ${data.days} dias ativado no plano ${data.plan}!`);
+      onSuccess();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Erro"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/80 p-4" onClick={onClose}>
+      <div className="card p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-xl font-extrabold flex items-center gap-2">
+            <Gift className="text-orange" size={18} />
+            Ativar trial
+          </h2>
+          <button onClick={onClose} className="text-gray2 hover:text-light">
+            <X size={18} />
+          </button>
+        </div>
+
+        <p className="text-sm text-gray2 mb-4">
+          Concede acesso ao tenant <strong className="text-light">{tenantName}</strong> por
+          N dias no plano escolhido. Sem cobrança Stripe.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="label block mb-1">Plano</label>
+            <select className="input w-full" value={planSlug} onChange={(e) => setPlanSlug(e.target.value)}>
+              {plans.map((p: any) => (
+                <option key={p.slug} value={p.slug}>
+                  {p.name} — {p.tier === "pro_plus" ? "Pro+" : p.tier}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label block mb-1">Dias de trial</label>
+            <div className="flex gap-2">
+              {[7, 14, 30, 60, 90].map((d) => (
+                <button key={d}
+                        type="button"
+                        onClick={() => setDays(d)}
+                        className={`flex-1 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                          days === d ? "bg-orange text-navy2 border-orange" : "border-border text-gray2 hover:text-light"
+                        }`}>
+                  {d}
+                </button>
+              ))}
+            </div>
+            <input type="number" min={1} max={365}
+                   value={days} onChange={(e) => setDays(Number(e.target.value))}
+                   className="input w-full mt-2 text-sm" placeholder="Ou digita" />
+          </div>
+
+          <div>
+            <label className="label block mb-1">Motivo (opcional)</label>
+            <textarea className="input w-full text-sm" rows={2}
+                      placeholder="Ex: Demo pra imobiliária Silva"
+                      value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+
+          <div className="bg-navy4/50 rounded-lg p-3 text-xs text-light/80">
+            <p>✅ Tenant ganha status <strong className="text-green-400">active</strong></p>
+            <p>✅ Subscription no plano escolhido por {days} dias</p>
+            <p>✅ Cota mensal do plano resetada pra 0</p>
+            <p>ℹ️ Ao expirar, sistema volta a exigir pagamento normal</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-border">
+          <button onClick={onClose} className="btn-ghost">Cancelar</button>
+          <button onClick={() => trialMut.mutate()}
+                  disabled={trialMut.isPending}
+                  className="btn-primary flex items-center gap-2">
+            <Gift size={14} />
+            {trialMut.isPending ? "Ativando..." : `Ativar ${days} dias`}
+          </button>
         </div>
       </div>
     </div>

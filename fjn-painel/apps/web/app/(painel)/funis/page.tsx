@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { PageIntro } from "@/components/layout/PageIntro";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const iconMap: Record<string, any> = {
   briefcase: Briefcase,
@@ -125,10 +126,18 @@ export default function FunisPage() {
       {isLoading ? (
         <p className="text-gray2 text-sm">Carregando funis...</p>
       ) : pipelines.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Kanban size={48} className="text-gray2 mx-auto mb-4" />
-          <p className="text-light/70">Nenhum funil ainda. Crie o primeiro!</p>
-        </div>
+        <EmptyState
+          icon={Kanban}
+          title="Comece com seu primeiro funil"
+          description="Organize as conversas WhatsApp em etapas visuais tipo Kanban. Cada oportunidade vira um card que você arrasta conforme avança a venda."
+          steps={[
+            { label: "Cria o funil", desc: 'Ex: "Atendimento", "Vendas Comercial", "Suporte"' },
+            { label: "Etapas padrão", desc: "Sistema já cria 6 etapas (Novo → Qualificando → Proposta → Negociação → Ganho/Perdido)" },
+            { label: "Personalize", desc: "Depois você edita etapas, cores e adiciona novas conforme seu processo" },
+          ]}
+          cta={{ label: "Criar primeiro funil", onClick: () => setShowCreate(true), icon: Plus }}
+          secondaryLink={{ label: "Ler guia do Funil →", href: "/ajuda/o-que-e-funil" }}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pipelines.map((p) => {

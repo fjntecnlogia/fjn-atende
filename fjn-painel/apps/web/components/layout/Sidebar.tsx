@@ -20,6 +20,7 @@ interface NavItem {
   label: string;
   icon: any;
   desc: string;  // aparece no tooltip pra explicar o que faz
+  isNew?: boolean;  // mostra badge "NOVO" laranja
 }
 
 interface NavGroup {
@@ -41,9 +42,9 @@ const tenantGroups: NavGroup[] = [
     title: "CRM & Funil",
     items: [
       { href: "/funis",    label: "Funis",    icon: Kanban,
-        desc: "Kanban visual das oportunidades de venda" },
+        desc: "Kanban visual das oportunidades de venda", isNew: true },
       { href: "/times",    label: "Times",    icon: Users,
-        desc: "Grupos de atendentes com distribuição automática" },
+        desc: "Grupos de atendentes com distribuição automática", isNew: true },
       { href: "/leads",    label: "Leads",    icon: UsersRound,
         desc: "Contatos capturados pela IA com interesse comercial" },
       { href: "/handoffs", label: "Handoffs", icon: AlertTriangle,
@@ -72,16 +73,16 @@ const tenantGroups: NavGroup[] = [
     title: "Conta",
     items: [
       { href: "/configuracoes/plano",    label: "Plano",    icon: CreditCard,
-        desc: "Ver e alterar sua assinatura Pro/Pro+" },
+        desc: "Ver e alterar sua assinatura Pro/Pro+", isNew: true },
       { href: "/configuracoes/branding", label: "Branding", icon: Palette,
-        desc: "Personalize logo, cores e marca (Pro+)" },
+        desc: "Personalize logo, cores e marca (Pro+)", isNew: true },
     ],
   },
   {
     title: "Suporte",
     items: [
       { href: "/ajuda", label: "Ajuda", icon: HelpCircle,
-        desc: "Tutoriais, dúvidas e cases de uso" },
+        desc: "Tutoriais, dúvidas e cases de uso", isNew: true },
     ],
   },
 ];
@@ -90,11 +91,11 @@ const superAdminNav: NavItem[] = [
   { href: "/admin",           label: "Visão Geral", icon: Crown,
     desc: "Métricas gerais da plataforma" },
   { href: "/admin/dashboard", label: "Dashboard",   icon: Sparkles,
-    desc: "Gráficos executivos: MRR, ARR, churn, conversão" },
+    desc: "Gráficos executivos: MRR, ARR, churn, conversão", isNew: true },
   { href: "/admin/billing",   label: "Billing",     icon: DollarSign,
-    desc: "Assinantes, receita e eventos do Stripe" },
+    desc: "Assinantes, receita e eventos do Stripe", isNew: true },
   { href: "/admin/usage",     label: "Consumo",     icon: Activity,
-    desc: "Ranking de tenants por consumo de IA" },
+    desc: "Ranking de tenants por consumo de IA", isNew: true },
   { href: "/admin/tenants",   label: "Tenants",     icon: Building2,
     desc: "Todas as contas cadastradas + impersonation" },
   { href: "/admin/planos",    label: "Planos",      icon: CreditCard,
@@ -215,7 +216,7 @@ function NavSection({
         {title}
       </p>
       <ul>
-        {items.map(({ href, label, icon: Icon, desc }) => {
+        {items.map(({ href, label, icon: Icon, desc, isNew }) => {
           const active = pathname === href
             || (href !== "/admin" && pathname.startsWith(href + "/"));
           return (
@@ -230,6 +231,11 @@ function NavSection({
                 )}>
                 <Icon size={16} className="flex-shrink-0" />
                 <span className="flex-1 truncate">{label}</span>
+                {isNew && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange/20 text-orange border border-orange/40 uppercase tracking-widest">
+                    Novo
+                  </span>
+                )}
               </Link>
             </li>
           );

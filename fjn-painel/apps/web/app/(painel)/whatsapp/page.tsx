@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { relativeTime } from "@/lib/utils";
 import { PageIntro } from "@/components/layout/PageIntro";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface Instance {
   id: number;
@@ -159,12 +160,19 @@ export default function WhatsAppPage() {
         ))}
 
         {instances.length === 0 && (
-          <div className="card p-10 col-span-full text-center">
-            <Smartphone size={32} className="text-gray2 mx-auto mb-3" />
-            <p className="text-gray2 text-sm mb-3">Nenhuma instância criada ainda</p>
-            <button onClick={createInstance} className="btn-primary text-sm">
-              Criar primeira instância
-            </button>
+          <div className="col-span-full">
+            <EmptyState
+              icon={Smartphone}
+              title="Conecte seu primeiro WhatsApp"
+              description="Cada instância é um número WhatsApp Business diferente. Você precisa de chip dedicado (não use pessoal) + WhatsApp Business instalado no celular."
+              steps={[
+                { label: "Criar instância", desc: "Clica no botão abaixo e dá um nome" },
+                { label: "Gerar QR Code", desc: "Um QR vai aparecer no painel" },
+                { label: "Escanear no celular", desc: "WhatsApp Business → Menu → Dispositivos conectados → Conectar dispositivo" },
+              ]}
+              cta={{ label: "Criar primeira instância", onClick: createInstance, icon: Plus }}
+              secondaryLink={{ label: "Ler guia detalhado →", href: "/ajuda/como-conectar-whatsapp" }}
+            />
           </div>
         )}
       </div>

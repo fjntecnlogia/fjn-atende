@@ -402,6 +402,76 @@ export async function billingRoutes(app: FastifyInstance) {
   });
 
   // -------------------------------------------------------------------
+  // POST /billing/admin/tenant/:id/trial — cria/renova trial admin
+  // Body: { days, plan_slug }
+  // Concede acesso ao tenant SEM cobrança Stripe. Usado pra demo/POC.
+  // -------------------------------------------------------------------
+  app.post("/admin/tenant/:id/trial", { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const tenantId = Number((req.params as any).id);
+    const { days, plan_slug, reason } = z.object({
+      days: z.number().int().min(1).max(365),
+      plan_slug: z.string().min(1),
+      reason: z.string().max(500).optional(),
+    }).parse(req.body);
+
+    // Valida que o plano existe
+    const planRes = await db.query(
+      `SELECT * FROM subscription_plans WHERE slug = $1 AND is_active = TRUE`,
+      [plan_slug],
+    );
+    if (planRes.rowCount === 0) return reply.code(404).send({ error: "plano não encontrado" });
+    const plan = planRes.rows[0];
+
+    // Cria ou atualiza subscription: active + estende period_end
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+
+      await client.query(
+        `INSERT INTO tenant_subscriptions
+           (tenant_id, plan_id, status, current_period_start, current_period_end,
+            ai_messages_used, campaign_msgs_used)
+         VALUES ($1, $2, 'active', NOW(), NOW() + ($3 || ' days')::interval, 0, 0)
+         ON CONFLICT (tenant_id) DO UPDATE SET
+           plan_id = EXCLUDED.plan_id,
+           status = 'active',
+           current_period_start = NOW(),
+           current_period_end = NOW() + ($3 || ' days')::interval,
+           ai_messages_used = 0,
+           campaign_msgs_used = 0,
+           updated_at = NOW()`,
+        [tenantId, plan.id, days],
+      );
+
+      // Ativa tenant
+      await client.query(
+        `UPDATE tenants SET status = 'active' WHERE id = $1`,
+        [tenantId],
+      );
+
+      // Evento no audit trail
+      await client.query(
+        `INSERT INTO subscription_events (tenant_id, event_type, to_plan_id, metadata)
+         VALUES ($1, 'admin_trial_granted', $2, $3)`,
+        [tenantId, plan.id, JSON.stringify({ days, plan_slug, reason: reason ?? null })],
+      );
+
+      await client.query("COMMIT");
+      return {
+        ok: true,
+        plan: plan.name,
+        days,
+        expires_at: new Date(Date.now() + days * 86400 * 1000).toISOString(),
+      };
+    } catch (err: any) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  });
+
+  // -------------------------------------------------------------------
   // POST /billing/admin/tenant/:id/extend — concede N dias grátis
   // -------------------------------------------------------------------
   app.post("/admin/tenant/:id/extend", { preHandler: requireSuperAdmin }, async (req, reply) => {

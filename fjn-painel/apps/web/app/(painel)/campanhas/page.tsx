@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { relativeTime } from "@/lib/utils";
 import { PageIntro } from "@/components/layout/PageIntro";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const statusBadge: Record<string, { label: string; variant: any }> = {
   draft:      { label: "Rascunho",   variant: "default" },
@@ -72,6 +73,20 @@ export default function CampanhasPage() {
       </div>
 
       {/* Lista de campanhas */}
+      {campaigns.length === 0 ? (
+        <EmptyState
+          icon={Megaphone}
+          title="Sua primeira campanha em 3 passos"
+          description="Ainda não há campanhas. Comece disparando mensagens em massa pros seus contatos com anti-ban integrado."
+          steps={[
+            { label: "Importar lista", desc: "Upload de CSV com telefones e nomes em /campanhas/listas" },
+            { label: "Criar template", desc: "Mensagem com variáveis como {{nome}} em /campanhas/templates" },
+            { label: "Nova campanha", desc: "Conectar lista + template + agendar disparo" },
+          ]}
+          cta={{ label: "Criar primeira campanha", href: "/campanhas/nova", icon: Plus }}
+          secondaryLink={{ label: "Ler guia completo →", href: "/ajuda/fazer-campanha" }}
+        />
+      ) : (
       <div className="space-y-3">
         {campaigns.map((c) => {
           const status = statusBadge[c.status] ?? statusBadge.draft;
@@ -121,16 +136,8 @@ export default function CampanhasPage() {
             </Link>
           );
         })}
-        {campaigns.length === 0 && (
-          <div className="card p-12 text-center">
-            <Megaphone className="mx-auto mb-3 text-gray2/50" size={32} />
-            <p className="text-gray2 text-sm">Nenhuma campanha criada ainda</p>
-            <Link href="/campanhas/nova" className="btn-primary inline-flex items-center gap-2 mt-4">
-              <Plus size={14} /> Criar primeira campanha
-            </Link>
-          </div>
-        )}
       </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Users, Plus, Crown, Shuffle, Hand, Activity, Trash2 } from "lucide-reac
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { PageIntro } from "@/components/layout/PageIntro";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface Team {
   id: number;
@@ -195,10 +196,18 @@ export default function TimesPage() {
 
       {/* Lista */}
       {teams.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Users size={48} className="text-gray2 mx-auto mb-4" />
-          <p className="text-light/70">Nenhum time ainda</p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="Crie times pra distribuir conversas"
+          description="Times agrupam atendentes e definem como as novas conversas são atribuídas — manual, round-robin (revezamento) ou pra quem tem menos cards abertos."
+          steps={[
+            { label: "Nomeia o time", desc: 'Ex: "Comercial", "Suporte 24h", "Vendas Alto Padrão"' },
+            { label: "Escolhe estratégia", desc: "Round-robin distribui equilibrado, Menos ocupado prioriza quem tá livre" },
+            { label: "Adiciona membros", desc: "Selectbox lista todos os usuários do tenant" },
+          ]}
+          cta={{ label: "Criar primeiro time", onClick: () => setShowCreate(true), icon: Plus }}
+          secondaryLink={{ label: "Ler guia de Times →", href: "/ajuda/times-atendimento" }}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {teams.map((t) => {
