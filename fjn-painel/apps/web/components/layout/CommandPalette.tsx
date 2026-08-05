@@ -41,7 +41,7 @@ const ADMIN_COMMANDS: Command[] = [
   { id: "admin-dashboard", label: "Super Admin: Dashboard", hint: "MRR, ARR, churn", href: "/admin/dashboard", icon: Sparkles, section: "Navegação", keywords: ["mrr", "arr", "grafico"] },
   { id: "admin-billing", label: "Super Admin: Billing", hint: "Assinantes e receita", href: "/admin/billing", icon: DollarSign, section: "Navegação", keywords: ["stripe", "receita"] },
   { id: "admin-usage", label: "Super Admin: Consumo", hint: "Ranking uso IA", href: "/admin/usage", icon: Activity, section: "Navegação", keywords: ["uso", "consumo"] },
-  { id: "admin-tenants", label: "Super Admin: Tenants", hint: "Todas as contas", href: "/admin/tenants", icon: Building2, section: "Navegação", keywords: ["contas", "clientes"] },
+  { id: "admin-tenants", label: "Super Admin: Assinantes", hint: "Todas as contas", href: "/admin/tenants", icon: Building2, section: "Navegação", keywords: ["contas", "clientes", "tenants", "assinantes"] },
   { id: "admin-planos", label: "Super Admin: Planos", hint: "Editar catálogo", href: "/admin/planos", icon: CreditCard, section: "Navegação", keywords: ["planos"] },
 ];
 

@@ -96,7 +96,7 @@ const superAdminNav: NavItem[] = [
     desc: "Assinantes, receita e eventos do Stripe", isNew: true },
   { href: "/admin/usage",     label: "Consumo",     icon: Activity,
     desc: "Ranking de tenants por consumo de IA", isNew: true },
-  { href: "/admin/tenants",   label: "Tenants",     icon: Building2,
+  { href: "/admin/tenants",   label: "Assinantes",  icon: Building2,
     desc: "Todas as contas cadastradas + impersonation" },
   { href: "/admin/planos",    label: "Planos",      icon: CreditCard,
     desc: "Editar preços, limites e features dos planos" },
