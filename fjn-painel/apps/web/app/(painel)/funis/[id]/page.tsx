@@ -9,7 +9,11 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, Trophy, XCircle, Clock, User, Tag, MoreVertical } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowLeft, Trophy, XCircle, Clock, User, Tag, MoreVertical,
+  Copy, FileText, History, Edit3, Hash, Calendar,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
@@ -25,6 +29,7 @@ interface Stage {
 
 interface Card {
   id: number;
+  number: number | null;
   conversation_id: number;
   pipeline_id: number;
   stage_id: number;
@@ -33,9 +38,18 @@ interface Card {
   value_cents: number;
   tags: string[];
   hours_in_stage: number;
+  assigned_user_id: number | null;
   assigned_user_name: string | null;
   assigned_team_name: string | null;
   last_message_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserOption {
+  id: number;
+  name: string;
+  email: string;
 }
 
 function money(cents: number): string {
@@ -48,14 +62,32 @@ function shortHours(h: number): string {
   return `${Math.floor(h / 24)}d`;
 }
 
+function shortDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) +
+    " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
 // =====================================================================
-// Card Component (draggable)
+// Card Component (estilo Alumy — draggable com header, valor, ações)
 // =====================================================================
-function CardItem({ card, won, lost }: { card: Card; won?: boolean; lost?: boolean }) {
+function CardItem({
+  card, won, lost, users, onAssignUser, onDuplicate, onOpenContract,
+}: {
+  card: Card;
+  won?: boolean;
+  lost?: boolean;
+  users: UserOption[];
+  onAssignUser: (cardId: number, userId: number | null) => void;
+  onDuplicate: (cardId: number) => void;
+  onOpenContract: (cardId: number) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `card-${card.id}`,
     data: { type: "card", card },
   });
+
+  const cardNumber = card.number ? `#${String(card.number).padStart(4, "0")}` : "—";
 
   return (
     <div
@@ -65,61 +97,142 @@ function CardItem({ card, won, lost }: { card: Card; won?: boolean; lost?: boole
         transition,
         opacity: isDragging ? 0.4 : 1,
       }}
-      {...attributes}
-      {...listeners}
-      className="bg-navy3 border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-orange/40 transition-colors"
+      className="bg-navy3 border border-border rounded-lg overflow-hidden hover:border-orange/40 transition-colors"
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-light text-sm font-semibold truncate">
-            {card.contact_name || "Sem nome"}
-          </p>
-          <p className="text-xs text-gray2 truncate">{card.contact_phone}</p>
+      {/* Header — número + drag handle + status */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="px-3 pt-3 pb-2 cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[10px] font-mono font-bold text-gray2 tracking-wider">
+            <Hash size={10} className="inline -mt-0.5" />
+            {String(card.number ?? "—").padStart(4, "0")}
+          </span>
+          <div className="flex items-center gap-1">
+            {won && <Trophy size={14} className="text-green-400" />}
+            {lost && <XCircle size={14} className="text-red-400" />}
+          </div>
         </div>
-        {won && <Trophy size={14} className="text-green-400 flex-shrink-0" />}
-        {lost && <XCircle size={14} className="text-red-400 flex-shrink-0" />}
+
+        {/* Valor em destaque */}
+        {card.value_cents > 0 && (
+          <p className="text-orange font-display font-extrabold text-lg leading-tight mt-1">
+            {money(card.value_cents)}
+          </p>
+        )}
+
+        {/* Contato */}
+        <p className="text-light text-sm font-semibold truncate mt-1">
+          {card.contact_name || "Sem nome"}
+        </p>
+        <p className="text-[11px] text-gray2 truncate">{card.contact_phone}</p>
+
+        {/* Tags */}
+        {card.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {card.tags.slice(0, 3).map((t) => (
+              <span key={t} className="text-[9px] bg-navy4 text-light/70 px-1.5 py-0.5 rounded">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {card.value_cents > 0 && (
-        <p className="text-orange font-bold text-sm font-display mb-2">
-          {money(card.value_cents)}
-        </p>
-      )}
-
-      {card.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {card.tags.slice(0, 3).map((t) => (
-            <span key={t} className="text-[10px] bg-navy4 text-light/70 px-1.5 py-0.5 rounded">
-              {t}
-            </span>
+      {/* Selector de responsável */}
+      <div className="px-3 py-1.5 border-t border-border/50 bg-navy2/40">
+        <select
+          value={card.assigned_user_id ?? ""}
+          onChange={(e) => onAssignUser(card.id, e.target.value ? Number(e.target.value) : null)}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="w-full bg-transparent text-[11px] text-light border-none focus:outline-none cursor-pointer"
+        >
+          <option value="" className="bg-navy3">— Não atribuído —</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id} className="bg-navy3">
+              {u.name}
+            </option>
           ))}
-        </div>
-      )}
+        </select>
+      </div>
 
-      <div className="flex items-center justify-between gap-2 text-[10px] text-gray2">
+      {/* Datas */}
+      <div className="px-3 py-1.5 border-t border-border/50 text-[10px] text-gray2 space-y-0.5">
         <div className="flex items-center gap-1">
-          {card.assigned_user_name ? (
-            <>
-              <User size={10} />
-              <span className="truncate max-w-[80px]">{card.assigned_user_name.split(" ")[0]}</span>
-            </>
-          ) : (
-            <span className="italic">não atribuído</span>
-          )}
+          <Calendar size={9} />
+          <span>Criado {shortDate(card.created_at)}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <Clock size={10} />
-          <span>{shortHours(card.hours_in_stage)}</span>
-        </div>
+        {card.updated_at !== card.created_at && (
+          <div className="flex items-center gap-1">
+            <Clock size={9} />
+            <span>Alterado {shortDate(card.updated_at)} · {shortHours(card.hours_in_stage)} nesta etapa</span>
+          </div>
+        )}
+      </div>
+
+      {/* Ações rápidas */}
+      <div className="flex border-t border-border/50 divide-x divide-border/50">
+        <ActionBtn
+          icon={Edit3}
+          label="Editar"
+          href={`/conversas?id=${card.conversation_id}`}
+        />
+        <ActionBtn
+          icon={Copy}
+          label="Duplicar"
+          onClick={() => onDuplicate(card.id)}
+        />
+        <ActionBtn
+          icon={FileText}
+          label="Contrato"
+          onClick={() => onOpenContract(card.id)}
+          highlight
+        />
+        <ActionBtn
+          icon={History}
+          label="Hist."
+          href={`/conversas?id=${card.conversation_id}#history`}
+        />
       </div>
     </div>
+  );
+}
+
+function ActionBtn({ icon: Icon, label, onClick, href, highlight }: {
+  icon: any; label: string; onClick?: () => void; href?: string; highlight?: boolean;
+}) {
+  const cls = `flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] transition-colors ${
+    highlight ? "text-orange hover:bg-orange/10" : "text-gray2 hover:text-light hover:bg-white/5"
+  }`;
+  const content = <><Icon size={11} /> {label}</>;
+  if (href) return <Link href={href} className={cls} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>{content}</Link>;
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+      onPointerDown={(e) => e.stopPropagation()}
+      className={cls}
+    >
+      {content}
+    </button>
   );
 }
 
 // =====================================================================
 // Column (droppable + sortable list)
 // =====================================================================
-function Column({ stage, cards }: { stage: Stage; cards: Card[] }) {
+function Column({
+  stage, cards, users, onAssignUser, onDuplicate, onOpenContract,
+}: {
+  stage: Stage;
+  cards: Card[];
+  users: UserOption[];
+  onAssignUser: (cardId: number, userId: number | null) => void;
+  onDuplicate: (cardId: number) => void;
+  onOpenContract: (cardId: number) => void;
+}) {
   const totalValue = cards.reduce((acc, c) => acc + c.value_cents, 0);
 
   return (
@@ -150,7 +263,16 @@ function Column({ stage, cards }: { stage: Stage; cards: Card[] }) {
             <p className="text-center text-xs text-gray2/60 py-8 italic">Nenhum card</p>
           ) : (
             cards.map((card) => (
-              <CardItem key={card.id} card={card} won={stage.is_won} lost={stage.is_lost} />
+              <CardItem
+                key={card.id}
+                card={card}
+                won={stage.is_won}
+                lost={stage.is_lost}
+                users={users}
+                onAssignUser={onAssignUser}
+                onDuplicate={onDuplicate}
+                onOpenContract={onOpenContract}
+              />
             ))
           )}
         </div>
@@ -180,6 +302,11 @@ export default function KanbanPage() {
     refetchInterval: 10_000,
   });
 
+  const { data: users = [] } = useQuery<UserOption[]>({
+    queryKey: ["tenant-users"],
+    queryFn: async () => (await api.get("/tenants/users")).data?.items ?? [],
+  });
+
   const moveMut = useMutation({
     mutationFn: async ({ cardId, stageId }: { cardId: number; stageId: number }) => {
       await api.post(`/cards/${cardId}/move`, { stage_id: stageId });
@@ -187,6 +314,25 @@ export default function KanbanPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cards", pipelineId] }),
     onError: (e: any) => toast.error(e?.response?.data?.error ?? "Erro ao mover"),
   });
+
+  const assignMut = useMutation({
+    mutationFn: async ({ cardId, userId }: { cardId: number; userId: number | null }) =>
+      api.post(`/cards/${cardId}/assign`, { user_id: userId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cards", pipelineId] });
+      toast.success("Responsável atualizado");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Erro"),
+  });
+
+  function handleDuplicate(cardId: number) {
+    toast("Duplicar em breve (Release 2)", { icon: "🚧" });
+  }
+
+  function handleOpenContract(cardId: number) {
+    // Placeholder Release 1 — abrir modal de contrato vem no Release 2
+    toast("Contrato/Orçamento em breve (Release 2)", { icon: "🚧", duration: 3000 });
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -279,6 +425,10 @@ export default function KanbanPage() {
                 key={stage.id}
                 stage={stage}
                 cards={cardsByStage[stage.id] ?? []}
+                users={users}
+                onAssignUser={(cardId, userId) => assignMut.mutate({ cardId, userId })}
+                onDuplicate={handleDuplicate}
+                onOpenContract={handleOpenContract}
               />
             ))}
           </div>

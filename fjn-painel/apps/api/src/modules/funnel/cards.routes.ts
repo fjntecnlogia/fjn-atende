@@ -230,15 +230,17 @@ export async function cardsRoutes(app: FastifyInstance) {
     }
 
     try {
+      const numberRes = await db.query(`SELECT next_card_number($1) AS n`, [req.tenantId]);
+      const cardNumber = numberRes.rows[0].n;
       const r = await db.query(
         `INSERT INTO conversation_cards
            (tenant_id, conversation_id, pipeline_id, stage_id,
-            assigned_user_id, assigned_team_id, value_cents, expected_close_date, tags)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            assigned_user_id, assigned_team_id, value_cents, expected_close_date, tags, number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [req.tenantId, data.conversation_id, data.pipeline_id, stageId,
          data.assigned_user_id ?? null, data.assigned_team_id ?? null,
-         data.value_cents, data.expected_close_date ?? null, data.tags],
+         data.value_cents, data.expected_close_date ?? null, data.tags, cardNumber],
       );
 
       await logHistory(r.rows[0].id, req.tenantId!, "created",
