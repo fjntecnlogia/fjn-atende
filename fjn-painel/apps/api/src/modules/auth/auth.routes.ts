@@ -24,7 +24,10 @@ export async function authRoutes(app: FastifyInstance) {
   // -----------------------------------------------------------------
   // Login
   // -----------------------------------------------------------------
-  app.post("/login", async (req, reply) => {
+  app.post(
+    "/login",
+    { config: { rateLimit: { max: 8, timeWindow: "1 minute" } } },
+    async (req, reply) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "dados inválidos" });
 
@@ -72,7 +75,8 @@ export async function authRoutes(app: FastifyInstance) {
       },
       tenant,
     };
-  });
+    },
+  );
 
   // -----------------------------------------------------------------
   // Signup público — cria tenant + usuário owner
